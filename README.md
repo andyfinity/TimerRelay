@@ -218,3 +218,14 @@ partitions.csv            oversized NVS for wear leveling
   hold the safe disabled state; manual On/Off overrides still apply.
 - Relay override **modes** persist separately from settings so toggling an
   override rewrites only a few bytes, not the whole schedule blob.
+
+## License
+
+Licensed under the **Apache License 2.0** — see [`LICENSE`](LICENSE) and
+[`NOTICE`](NOTICE). Source files carry an SPDX header
+(`SPDX-License-Identifier: Apache-2.0`).
+
+The bundled **cJSON** in [`components/cjson/`](components/cjson/) is third-party
+code under the **MIT License** (see `components/cjson/LICENSE`) and keeps its own
+terms. ESP-IDF (Apache-2.0) and `@companion-module/base` are pulled in at build
+time and not redistributed here.

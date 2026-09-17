@@ -1,0 +1,25 @@
+TimerRelayV2
+Copyright 2026 Andy Russell
+
+Licensed under the Apache License, Version 2.0 (see the LICENSE file).
+
+This codebase was primarily written by Claude Opus 4.8 (Anthropic).
+
+--------------------------------------------------------------------------------
+Third-party components
+--------------------------------------------------------------------------------
+
+cJSON (bundled in components/cjson/)
+  MIT License. Copyright (c) 2009-2017 Dave Gamble and cJSON contributors.
+  Full license text: components/cjson/LICENSE
+  cJSON is redistributed unmodified under its own terms and is NOT covered by
+  the Apache-2.0 license that applies to the rest of this project.
+
+Espressif ESP-IDF
+  This firmware is built against ESP-IDF (Apache-2.0). ESP-IDF is not
+  redistributed in this repository; it is provided by the developer's SDK
+  installation at build time.
+
+@companion-module/base (Bitfocus Companion module SDK)
+  Used by the Companion module in companion-module/. Provided via npm at build
+  time and not redistributed here; see its own package for license terms.

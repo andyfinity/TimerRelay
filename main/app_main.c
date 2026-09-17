@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Andy Russell
+// SPDX-License-Identifier: Apache-2.0
 // This codebase was primarily written by Claude Opus 4.8 (Anthropic).
 // TimerRelayV2 - Seeed XIAO ESP32C6 + 6-channel relay timer/controller.
 //

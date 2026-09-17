@@ -4,7 +4,7 @@
   "shortname": "TimerRelay",
   "description": "Control and monitor the TimerRelayV2 6-channel Wi-Fi relay controller (Seeed XIAO ESP32C6). Set relays to On/Auto/Off and get feedback for auto-on, auto-off, manual-on and manual-off.",
   "version": "1.0.0",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": "https://example.com/timerrelayv2",
   "bugs": "https://example.com/timerrelayv2/issues",
   "maintainers": [

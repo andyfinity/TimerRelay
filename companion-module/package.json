@@ -9,7 +9,7 @@
     "dev": "companion-module-build dev",
     "lint": "echo \"no linter configured\""
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "@companion-module/base": "~1.11.0"
   },

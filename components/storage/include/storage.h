@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Andy Russell
+// SPDX-License-Identifier: Apache-2.0
 // This codebase was primarily written by Claude Opus 4.8 (Anthropic).
 // storage - thin NVS wrapper. NVS provides built-in wear leveling across its
 // (deliberately oversized) partition; callers add write-on-change on top.
