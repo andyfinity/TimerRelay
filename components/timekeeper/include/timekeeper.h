@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Andy Russell
 // SPDX-License-Identifier: Apache-2.0
-// This codebase was primarily written by Claude Opus 4.8 (Anthropic).
 // timekeeper - system clock: SNTP over Wi-Fi, manual set fallback, and POSIX
 // timezone handling (with DST) from a curated region list.
 //

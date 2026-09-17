@@ -1,5 +1,3 @@
-> _This codebase was primarily written by Claude Opus 4.8 (Anthropic)._
-
 # TimerRelayV2
 
 Timer-driven controller for the **Seeed Studio XIAO ESP32C6 + 6-channel Wi-Fi 5V relay** board.
@@ -229,3 +227,9 @@ The bundled **cJSON** in [`components/cjson/`](components/cjson/) is third-party
 code under the **MIT License** (see `components/cjson/LICENSE`) and keeps its own
 terms. ESP-IDF (Apache-2.0) and `@companion-module/base` are pulled in at build
 time and not redistributed here.
+
+### Authorship
+
+This project was developed by the author with the assistance of **Claude Opus 4.8**
+(Anthropic), which generated much of the code under the author's direction and
+review. See [`NOTICE`](NOTICE).

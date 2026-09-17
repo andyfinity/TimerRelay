@@ -1,5 +1,3 @@
-> _This codebase was primarily written by Claude Opus 4.8 (Anthropic)._
-
 # TimerRelayV2
 
 Control and monitor a **TimerRelayV2** 6-channel Wi-Fi relay controller (Seeed XIAO ESP32C6) from Bitfocus Companion.

@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Andy Russell
 // SPDX-License-Identifier: Apache-2.0
-// This codebase was primarily written by Claude Opus 4.8 (Anthropic).
 const RELAY_CHOICES = Array.from({ length: 6 }, (_, i) => ({ id: i + 1, label: `Relay ${i + 1}` }))
 const MODE_CHOICES = [
 	{ id: 'on', label: 'On (manual override, energized / NO)' },

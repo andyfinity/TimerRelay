@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Andy Russell
 // SPDX-License-Identifier: Apache-2.0
-// This codebase was primarily written by Claude Opus 4.8 (Anthropic).
 // Curated list of timezones as POSIX TZ strings (DST rules embedded). This is
 // the standard embedded approach: small flash footprint, DST-correct, no need
 // to ship the full IANA database. Add rows here to widen coverage.

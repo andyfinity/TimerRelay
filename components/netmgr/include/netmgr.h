@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Andy Russell
 // SPDX-License-Identifier: Apache-2.0
-// This codebase was primarily written by Claude Opus 4.8 (Anthropic).
 // netmgr - Wi-Fi lifecycle. Joins the configured network as a station; if none
 // is configured, or the join does not succeed within a timeout, it falls back
 // to hosting its own open AP with a captive portal so the user can configure it.

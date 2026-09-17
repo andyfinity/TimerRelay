@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Andy Russell
 // SPDX-License-Identifier: Apache-2.0
-// This codebase was primarily written by Claude Opus 4.8 (Anthropic).
 // webserver - serves the embedded dark-theme config site and the REST API.
 #pragma once
 
