@@ -1,0 +1,19 @@
+{
+  "name": "russellworks-timerrelay",
+  "version": "1.0.0",
+  "description": "Bitfocus Companion module for the TimerRelayV2 6-channel Wi-Fi relay controller (Seeed XIAO ESP32C6).",
+  "main": "main.js",
+  "type": "commonjs",
+  "scripts": {
+    "build": "companion-module-build",
+    "dev": "companion-module-build dev",
+    "lint": "echo \"no linter configured\""
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@companion-module/base": "~1.11.0"
+  },
+  "devDependencies": {
+    "@companion-module/tools": "~2.1.0"
+  }
+}

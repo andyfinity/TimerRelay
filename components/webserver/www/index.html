@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f1420">
+  <title>Timer Relay</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo"></span>
+      <div>
+        <h1 id="devname">Timer Relay</h1>
+        <div class="sub" id="devhost">timerrelay</div>
+      </div>
+    </div>
+    <div class="pills" id="pills">
+      <span class="pill" id="pill-net">Wi-Fi</span>
+      <span class="pill" id="pill-time">Time</span>
+      <span class="pill" id="pill-ntp">NTP</span>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="relays">Relays</button>
+    <button class="tab" data-tab="schedule">Schedule</button>
+    <button class="tab" data-tab="time">Time &amp; Zone</button>
+    <button class="tab" data-tab="wifi">Wi-Fi</button>
+  </nav>
+
+  <main>
+    <!-- RELAYS -->
+    <section class="panel active" id="tab-relays">
+      <div class="relay-grid" id="relayGrid"></div>
+    </section>
+
+    <!-- SCHEDULE -->
+    <section class="panel" id="tab-schedule">
+      <div class="row-between">
+        <h2>Weekly schedule</h2>
+        <div>
+          <button class="btn" id="addEvent">+ Add event</button>
+          <button class="btn primary" id="saveSchedule">Save schedule</button>
+        </div>
+      </div>
+      <p class="hint">Each event enables (NO) or disables (NC) the selected relays at a time on the chosen days. The most recent past event wins; simultaneous events apply together.</p>
+      <div id="eventList" class="event-list"></div>
+      <div id="schedMsg" class="msg"></div>
+    </section>
+
+    <!-- TIME -->
+    <section class="panel" id="tab-time">
+      <h2>Time &amp; timezone</h2>
+      <div class="card">
+        <div class="kv"><span>Device time</span><b id="curTime">—</b></div>
+        <div class="kv"><span>Source</span><b id="curSource">—</b></div>
+        <div class="kv"><span>NTP</span><b id="curNtp">—</b></div>
+      </div>
+      <div class="card">
+        <label>Timezone</label>
+        <div class="inline">
+          <select id="tzSelect"></select>
+          <button class="btn primary" id="saveTz">Set</button>
+        </div>
+      </div>
+      <div class="card">
+        <label>Set time manually</label>
+        <p class="hint">Use if NTP is unavailable. This board has no battery RTC, so a manually set clock is lost on power-off until NTP or a new manual set.</p>
+        <div class="inline">
+          <input type="datetime-local" id="manualTime" step="1">
+          <button class="btn" id="useNow">Use browser time</button>
+          <button class="btn primary" id="saveTime">Set</button>
+        </div>
+      </div>
+      <div id="timeMsg" class="msg"></div>
+    </section>
+
+    <!-- WIFI -->
+    <section class="panel" id="tab-wifi">
+      <h2>Wi-Fi</h2>
+      <div class="card">
+        <div class="kv"><span>State</span><b id="wifiState">—</b></div>
+        <div class="kv"><span>IP address</span><b id="wifiIp">—</b></div>
+      </div>
+      <div class="card">
+        <label>Network name (SSID)</label>
+        <input type="text" id="ssid" autocomplete="off" placeholder="Your Wi-Fi SSID">
+        <label>Password</label>
+        <input type="password" id="wpass" autocomplete="off" placeholder="Leave blank for open network">
+        <div class="inline end">
+          <button class="btn primary" id="saveWifi">Save &amp; connect</button>
+        </div>
+        <p class="hint">The device restarts its Wi-Fi to join. If it can't, it re-hosts its own <b id="apName">setup</b> network.</p>
+      </div>
+      <div id="wifiMsg" class="msg"></div>
+    </section>
+  </main>
+
+  <footer>TimerRelayV2 · Seeed XIAO ESP32C6 · 6-channel relay</footer>
+  <script src="/app.js"></script>
+</body>
+</html>

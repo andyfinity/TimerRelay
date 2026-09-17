@@ -1,0 +1,23 @@
+{
+  "id": "russellworks-timerrelay",
+  "name": "russellworks-timerrelay",
+  "shortname": "TimerRelay",
+  "description": "Control and monitor the TimerRelayV2 6-channel Wi-Fi relay controller (Seeed XIAO ESP32C6). Set relays to On/Auto/Off and get feedback for auto-on, auto-off, manual-on and manual-off.",
+  "version": "1.0.0",
+  "license": "MIT",
+  "repository": "https://example.com/timerrelayv2",
+  "bugs": "https://example.com/timerrelayv2/issues",
+  "maintainers": [
+    { "name": "Russell.works", "email": "andy@russell.works" }
+  ],
+  "legacyIds": [],
+  "runtime": {
+    "type": "node22",
+    "api": "nodejs-ipc",
+    "apiVersion": "1.0.0",
+    "entrypoint": "../main.js"
+  },
+  "manufacturer": "Russell.works",
+  "products": ["TimerRelayV2"],
+  "keywords": ["relay", "timer", "esp32", "esp32c6", "xiao", "gpio", "automation"]
+}

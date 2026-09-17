@@ -1,0 +1,106 @@
+(kicad_sch
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "ef90cf75-f96a-4bad-9f2c-688024ccf7ef")
+	(paper "A4")
+	(lib_symbols)
+	(sheet
+		(at 83.312 65.024)
+		(size 43.18 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "76b7c2f1-76a8-42d5-8146-a3a0d1d4aba1")
+		(property "Sheetname" "01 Descriptions"
+			(at 83.312 64.3124 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "01 Descriptions.kicad_sch"
+			(at 83.312 91.0086 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "Relay Box for XIAO"
+				(path "/ef90cf75-f96a-4bad-9f2c-688024ccf7ef"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 163.576 63.5)
+		(size 38.1 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "c7431f7d-5eee-4f48-ac62-0fac3486818b")
+		(property "Sheetname" "02 Power"
+			(at 163.576 62.7884 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "02 Power.kicad_sch"
+			(at 163.576 89.4846 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "Relay Box for XIAO"
+				(path "/ef90cf75-f96a-4bad-9f2c-688024ccf7ef"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)

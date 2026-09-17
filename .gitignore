@@ -1,0 +1,21 @@
+# --- ESP-IDF build output ---
+/build/
+sdkconfig
+sdkconfig.old
+sdkconfig.ci
+
+# ESP-IDF component manager (deps are vendored in-tree under components/)
+managed_components/
+dependencies.lock
+
+# --- Companion module ---
+companion-module/node_modules/
+companion-module/pkg/
+companion-module/*.tgz
+companion-module/package-lock.json
+
+# --- Editor / OS ---
+*.swp
+*~
+.DS_Store
+Thumbs.db

@@ -1,0 +1,37 @@
+# TimerRelayV2 default sdkconfig - applied on a clean build.
+# Target
+CONFIG_IDF_TARGET="esp32c6"
+
+# Flash: XIAO ESP32C6 has 4 MB
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+
+# Custom partition table (large NVS for wear-leveling headroom)
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# Console over the built-in USB Serial/JTAG (no GPIO UART pins consumed;
+# D6/D7 = GPIO16/17 are free for the onboard buttons).
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# HTTP server headroom for the config site + REST API
+CONFIG_HTTPD_MAX_URI_HANDLERS=32
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048
+CONFIG_HTTPD_MAX_URI_LEN=512
+
+# 1 ms tick: crisp 1 Hz scheduling and sub-second relay application
+CONFIG_FREERTOS_HZ=1000
+
+# SNTP: keep a couple of servers.
+# LWIP_DHCP_GET_NTP_SRV must be enabled for the `server_from_dhcp = true` in
+# timekeeper.c to take effect (it lets the DHCP lease supply NTP servers, which
+# many networks provide); LWIP_DHCP_MAX_NTP_SERVERS depends on it.
+CONFIG_LWIP_SNTP_MAX_SERVERS=2
+CONFIG_LWIP_DHCP_GET_NTP_SRV=y
+CONFIG_LWIP_DHCP_MAX_NTP_SERVERS=2
+
+# Main task stack (webserver JSON + schedule share the app; give room)
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144
+
+# Bump default event loop / system event task a touch for Wi-Fi + captive DNS
+CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096

@@ -1,0 +1,35 @@
+{
+  "version": "2.0.0",
+  "options": {
+    "env": {
+      "IDF_PATH": "/home/russan/.espressif/v6.0.2/esp-idf"
+    }
+  },
+  "tasks": [
+    {
+      "label": "ESP-IDF: Build",
+      "type": "shell",
+      "command": ". /home/russan/.espressif/v6.0.2/esp-idf/export.sh >/dev/null && idf.py build",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "ESP-IDF: Fullclean",
+      "type": "shell",
+      "command": ". /home/russan/.espressif/v6.0.2/esp-idf/export.sh >/dev/null && idf.py fullclean",
+      "problemMatcher": []
+    },
+    {
+      "label": "ESP-IDF: Flash + Monitor",
+      "type": "shell",
+      "command": ". /home/russan/.espressif/v6.0.2/esp-idf/export.sh >/dev/null && idf.py flash monitor",
+      "problemMatcher": []
+    },
+    {
+      "label": "ESP-IDF: Menuconfig",
+      "type": "shell",
+      "command": ". /home/russan/.espressif/v6.0.2/esp-idf/export.sh >/dev/null && idf.py menuconfig",
+      "problemMatcher": []
+    }
+  ]
+}

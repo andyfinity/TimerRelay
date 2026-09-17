@@ -1,0 +1,18 @@
+{
+  "idf.espIdfPath": "/home/russan/.espressif/v6.0.2/esp-idf",
+  "idf.toolsPath": "/home/russan/.espressif",
+  "idf.adapterTargetName": "esp32c6",
+  "idf.flashType": "UART",
+  "idf.openOcdConfigs": [
+    "board/esp32c6-builtin.cfg"
+  ],
+  "files.associations": {
+    "*.h": "c",
+    "*.c": "c"
+  },
+  "C_Cpp.intelliSenseEngine": "default",
+  "cmake.configureOnOpen": false,
+  "cmake.sourceDirectory": "${workspaceFolder}",
+  "idf.currentSetup": "/home/russan/.espressif/v6.0.2/esp-idf",
+  "idf.port": "/dev/ttyACM0"
+}
