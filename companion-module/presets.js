@@ -1,3 +1,4 @@
+// This codebase was primarily written by Claude Opus 4.8 (Anthropic).
 const { combineRgb } = require('@companion-module/base')
 
 // One preset row per relay: On / Auto / Off buttons that also colour themselves

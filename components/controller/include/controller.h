@@ -1,3 +1,4 @@
+// This codebase was primarily written by Claude Opus 4.8 (Anthropic).
 // controller - the single 1 Hz control loop that owns relay output.
 //
 // Each tick it computes every relay's desired state from its override mode and

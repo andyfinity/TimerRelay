@@ -1,3 +1,4 @@
+// This codebase was primarily written by Claude Opus 4.8 (Anthropic).
 // TimerRelayV2 - Seeed XIAO ESP32C6 + 6-channel relay timer/controller.
 //
 // Boot order is chosen so the relays reach their safe (disabled) state as early

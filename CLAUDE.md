@@ -1,3 +1,5 @@
+> _This codebase was primarily written by Claude Opus 4.8 (Anthropic)._
+
 # CLAUDE.md — TimerRelayV2
 
 Guidance for working in this repo.

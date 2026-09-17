@@ -1,3 +1,4 @@
+// This codebase was primarily written by Claude Opus 4.8 (Anthropic).
 function getVariableDefinitions(relayCount) {
 	const defs = []
 	for (let i = 1; i <= relayCount; i++) {

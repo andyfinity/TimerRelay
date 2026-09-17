@@ -1,3 +1,4 @@
+// This codebase was primarily written by Claude Opus 4.8 (Anthropic).
 // relays - low-level GPIO driver for the Seeed 6-channel relay board.
 //
 // Relay -> XIAO pin -> ESP32C6 GPIO (from the board schematic, 02 Power.kicad_sch):

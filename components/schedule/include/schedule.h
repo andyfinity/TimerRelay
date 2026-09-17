@@ -1,3 +1,4 @@
+// This codebase was primarily written by Claude Opus 4.8 (Anthropic).
 // schedule - evaluates the configured events into a desired auto-state vector.
 //
 // Model: each event is a *transition* that, when it fires, sets its target

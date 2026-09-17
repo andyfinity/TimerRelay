@@ -1,3 +1,4 @@
+// This codebase was primarily written by Claude Opus 4.8 (Anthropic).
 #include "storage.h"
 
 #include "nvs_flash.h"

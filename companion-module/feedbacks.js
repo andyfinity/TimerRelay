@@ -1,3 +1,4 @@
+// This codebase was primarily written by Claude Opus 4.8 (Anthropic).
 const { combineRgb } = require('@companion-module/base')
 const { RELAY_CHOICES } = require('./actions')
 

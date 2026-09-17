@@ -1,3 +1,5 @@
+> _This codebase was primarily written by Claude Opus 4.8 (Anthropic)._
+
 # TimerRelayV2
 
 Timer-driven controller for the **Seeed Studio XIAO ESP32C6 + 6-channel Wi-Fi 5V relay** board.
