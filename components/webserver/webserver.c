@@ -272,11 +272,13 @@ static esp_err_t h_get_config(httpd_req_t *req)
         cJSON *mo = cJSON_CreateObject();
         cJSON_AddNumberToObject(mo, "index", mi);
         cJSON_AddStringToObject(mo, "name", m->name);
+        cJSON_AddNumberToObject(mo, "loop", m->loop_count);
         cJSON *steps = cJSON_AddArrayToObject(mo, "steps");
         for (int s = 0; s < m->step_count; s++) {
             const macro_step_t *st = &m->steps[s];
             cJSON *so = cJSON_CreateObject();
             cJSON_AddNumberToObject(so, "delay", st->delay_s);
+            cJSON_AddNumberToObject(so, "call", st->call_macro);
             cJSON_AddStringToObject(so, "action", mode_to_str(st->action));
             cJSON *sr = cJSON_AddArrayToObject(so, "relays");
             for (int r = 0; r < RELAY_COUNT; r++)
@@ -421,23 +423,36 @@ static void json_to_macro(cJSON *mo, macro_t *m)
     const char *nm = cJSON_GetStringValue(cJSON_GetObjectItem(mo, "name"));
     strlcpy(m->name, nm ? nm : "", sizeof(m->name));
 
+    cJSON *jl = cJSON_GetObjectItem(mo, "loop");
+    int lc = cJSON_IsNumber(jl) ? jl->valueint : 1;   // default: run once
+    if (lc < 0) lc = 0;                                // 0 = infinite
+    if (lc > 65535) lc = 65535;
+    m->loop_count = (uint16_t)lc;
+
     cJSON *steps = cJSON_GetObjectItem(mo, "steps");
     int sc = 0, v_i;
     cJSON *so;
     cJSON_ArrayForEach(so, steps) {
         if (sc >= MAX_MACRO_STEPS) break;
         macro_step_t *st = &m->steps[sc];
+        st->call_macro = -1;
         cJSON *jd = cJSON_GetObjectItem(so, "delay");
         int d = cJSON_IsNumber(jd) ? jd->valueint : 0;
         if (d < 0) d = 0;
         if (d > 65535) d = 65535;
         st->delay_s = (uint16_t)d;
-        st->action = str_to_mode(cJSON_GetStringValue(cJSON_GetObjectItem(so, "action")));
-        cJSON *sr = cJSON_GetObjectItem(so, "relays");
-        cJSON *v;
-        cJSON_ArrayForEach(v, sr) {
-            v_i = v->valueint;
-            if (v_i >= 1 && v_i <= RELAY_COUNT) st->relay_mask |= (1u << (v_i - 1));
+
+        cJSON *jc = cJSON_GetObjectItem(so, "call");
+        if (cJSON_IsNumber(jc) && jc->valueint >= 0 && jc->valueint < MAX_MACROS) {
+            st->call_macro = (int8_t)jc->valueint;   // call step
+        } else {
+            st->action = str_to_mode(cJSON_GetStringValue(cJSON_GetObjectItem(so, "action")));
+            cJSON *sr = cJSON_GetObjectItem(so, "relays");
+            cJSON *v;
+            cJSON_ArrayForEach(v, sr) {
+                v_i = v->valueint;
+                if (v_i >= 1 && v_i <= RELAY_COUNT) st->relay_mask |= (1u << (v_i - 1));
+            }
         }
         sc++;
     }

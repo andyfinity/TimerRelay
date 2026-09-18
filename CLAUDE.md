@@ -33,8 +33,10 @@ mutex plus a persisted `app_config_t` and a volatile `app_runtime_t`. Take
 - **Clock validity gates AUTO relays.** When `time_valid` is false, AUTO relays
   are forced off; manual overrides still apply. Preserve this in `controller.c`.
 - **Write-on-change persistence.** Persist via `appstate_save_config()`, which
-  diffs against shadow copies and splits settings vs. the frequently-changed
-  relay-mode blob. Don't add unconditional NVS writes (flash wear).
+  diffs against shadow copies and writes three independent NVS blobs: settings,
+  Wi-Fi credentials (`KEY_WIFI` — separate so settings-layout changes never lose
+  the network config), and the frequently-changed relay modes. Don't add
+  unconditional NVS writes (flash wear). Bump `SETTINGS_MAGIC` on a layout change.
 - **Local-time scheduling.** `schedule.c` uses `mktime`/`localtime_r` with the TZ
   env set by `timekeeper`. All event times are local wall-clock.
 
@@ -54,6 +56,10 @@ controller calls `macros_tick()` each tick (auto-advance) and edge-fires
 macro-target schedule events via `schedule_collect_macro_starts()`; webserver/REST
 call `macros_start/stop/step` then `controller_notify()`. Keep macros off GPIO and
 off wall-clock time. A schedule event's `target` selects relays vs. a macro.
+A step is either a relay action (`call_macro < 0`) or a call to another macro
+(`call_macro >= 0`); a macro's `loop_count` repeats its sequence (0 = forever).
+The engine runs a small frame stack (`MACRO_CALL_DEPTH`) so calls nest; per-tick
+and per-resolve guards cap runaway zero-delay loops and recursion.
 
 ## Web UI
 Embedded from `components/webserver/www/` via `EMBED_FILES` (symbols like

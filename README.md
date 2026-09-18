@@ -12,10 +12,11 @@ Companion module. Built with **ESP-IDF v6.0.2**.
   expansion; the evaluator implements all of them.
 - **Per-relay override**: On / Auto / Off, from the web UI, REST API, or Companion.
 - **Macros**: named, timed sequences of relay actions with an arbitrary per-step
-  delay (e.g. relay 1 on, wait 5 s, relay 2 on, wait 10 s, both off). Startable
-  from the web UI, REST API, a schedule event, or Companion (start / stop / step,
-  with active-macro feedback). Step timing is monotonic, so macros run even
-  before the clock is valid.
+  delay (e.g. relay 1 on, wait 5 s, relay 2 on, wait 10 s, both off). A macro can
+  **loop** a set number of times (e.g. blink a relay 10×) and **call other
+  macros** (nested up to 8 deep). Startable from the web UI, REST API, a schedule
+  event, or Companion (start / stop / step, with active-macro feedback). Step
+  timing is monotonic, so macros run even before the clock is valid.
 - **Timekeeping** via NTP over Wi-Fi, with a manual-set fallback and a curated,
   DST-correct timezone list (POSIX TZ strings).
 - **Networking**: joins your Wi-Fi as a station; if none is configured or the join
@@ -159,13 +160,18 @@ behaviour above) or `"macro"`, in which case the event starts macro **`macro`**
 
 ### POST `/api/macros` — replace all macro definitions
 
-Body: `{"macros":[{"name":"…","steps":[{"delay":<s>,"action":"on|off|auto","relays":[…]}]}]}`.
-Each step waits `delay` seconds (relative to the previous step) then applies
-`action` to its relays. Slot index = array position; schedule events reference
-macros by that index. Up to 8 macros × 24 steps.
+Body: `{"macros":[{"name":"…","loop":<n>,"steps":[…]}]}`. `loop` repeats the whole
+step sequence `n` times (**0 = forever**, default 1). Each step waits `delay`
+seconds (relative to the previous step) then does one of:
+- a relay action — `{"delay":<s>,"action":"on|off|auto","relays":[…]}`
+- a macro call — `{"delay":<s>,"call":<macro index>}` (nested up to 8 deep)
+
+Slot index = array position; schedule events and macro calls reference macros by
+that index. Up to 8 macros × 24 steps.
 
 ```bash
-curl -X POST http://timerrelay.local/api/macros -H 'Content-Type: application/json' -d '{"macros":[{"name":"Startup","steps":[{"delay":0,"action":"on","relays":[1]},{"delay":5,"action":"on","relays":[2]},{"delay":10,"action":"off","relays":[1,2]}]}]}'
+# "Blink relay 1" ten times (on 1 s, off 1 s):
+curl -X POST http://timerrelay.local/api/macros -H 'Content-Type: application/json' -d '{"macros":[{"name":"Blink","loop":10,"steps":[{"delay":0,"action":"on","relays":[1]},{"delay":1,"action":"off","relays":[1]},{"delay":1,"action":"auto","relays":[]}]}]}'
 ```
 
 ### POST `/api/macro` — start / stop / step a macro
@@ -249,6 +255,8 @@ partitions.csv            oversized NVS for wear leveling
   hold the safe disabled state; manual On/Off overrides still apply.
 - Relay override **modes** persist separately from settings so toggling an
   override rewrites only a few bytes, not the whole schedule blob.
+- **Wi-Fi credentials** live in their own NVS blob, separate from the settings
+  blob, so changes to the settings layout never reset the network configuration.
 
 ## License
 

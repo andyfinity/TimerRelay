@@ -65,7 +65,7 @@ h1 { font-size: 18px; margin: 0; }
 .tab:hover { color: var(--txt); }
 .tab.active { color: var(--txt); border-bottom-color: var(--accent); }
 
-main { max-width: 860px; margin: 0 auto; padding: 20px 16px 60px; }
+main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 60px; }
 .panel { display: none; }
 .panel.active { display: block; animation: fade .2s ease; }
 @keyframes fade { from { opacity: 0; transform: translateY(4px);} to {opacity:1;} }
@@ -147,7 +147,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 }
 .chip.sel { background: var(--accent); border-color: var(--accent); color: #fff; }
 .event .timeinput { width: 130px; }
-.event .actsel { width: 110px; }
+/* Auto-size dropdowns so option text (macro names, "Start macro") isn't cut off. */
+.event .actsel { width: auto; min-width: 130px; max-width: 240px; }
 .event .del { margin-left: auto; color: var(--red); background: none; border: none; cursor: pointer; font-size: 13px; }
 .switch { position: relative; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
 .switch input { display: none; }
@@ -170,6 +171,9 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 }
 .mhead { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .mname { flex: 1; min-width: 160px; font-weight: 600; }
+.mloop { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: 13px; white-space: nowrap; }
+.loopinput { width: 66px; }
+.mstep .actsel { width: auto; min-width: 130px; max-width: 220px; }
 .mbtns { display: flex; gap: 6px; flex-wrap: wrap; }
 .mbtns .btn { padding: 8px 12px; }
 .steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }

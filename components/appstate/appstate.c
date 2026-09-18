@@ -14,12 +14,21 @@ static const char *TAG = "appstate";
 // their own tiny blob; the settings blob (Wi-Fi, TZ, schedule) changes rarely.
 #define KEY_SETTINGS "settings"
 #define KEY_MODES    "modes"
+#define KEY_WIFI     "wifi"
 
-// On-flash image of everything except the frequently-written relay modes.
+// Wi-Fi credentials live in their own small blob so that changes to the larger
+// settings layout never cost the user their network configuration.
 typedef struct {
     uint32_t magic;
-    char     wifi_ssid[WIFI_SSID_MAX];
-    char     wifi_pass[WIFI_PASS_MAX];
+    char     ssid[WIFI_SSID_MAX];
+    char     pass[WIFI_PASS_MAX];
+} wifi_blob_t;
+#define WIFI_MAGIC 0x54524C57u  // "TRLW"
+
+// On-flash image of the rarely-changed settings. Excludes Wi-Fi and the
+// frequently-written relay modes, each of which has its own blob.
+typedef struct {
+    uint32_t magic;
     char     tz_name[TZ_NAME_MAX];
     char     tz_posix[TZ_POSIX_MAX];
     char     hostname[HOSTNAME_MAX];
@@ -29,8 +38,8 @@ typedef struct {
     macro_t  macros[MAX_MACROS];
 } settings_blob_t;
 
-// Bumped to TRL2 when macros + schedule targets were added to the blob layout.
-#define SETTINGS_MAGIC 0x54524C32u  // "TRL2"
+// Bumped to TRL3 when Wi-Fi split into its own blob and macro calls/loops landed.
+#define SETTINGS_MAGIC 0x54524C33u  // "TRL3"
 
 static SemaphoreHandle_t s_mutex;
 static app_config_t      s_cfg;
@@ -39,17 +48,24 @@ static app_runtime_t     s_rt;
 // Shadows of what is currently on flash, for write-on-change comparison.
 static settings_blob_t   s_shadow_settings;
 static uint8_t           s_shadow_modes[RELAY_COUNT];
+static wifi_blob_t       s_shadow_wifi;
 
 // Scratch blob buffer. The struct is a few KB; keep it off the (smaller) task
 // stacks. Only ever touched while the appstate lock is held.
 static settings_blob_t   s_iobuf;
 
+static void pack_wifi(wifi_blob_t *w)
+{
+    memset(w, 0, sizeof(*w));
+    w->magic = WIFI_MAGIC;
+    memcpy(w->ssid, s_cfg.wifi_ssid, sizeof(w->ssid));
+    memcpy(w->pass, s_cfg.wifi_pass, sizeof(w->pass));
+}
+
 static void pack_settings(settings_blob_t *b)
 {
     memset(b, 0, sizeof(*b));
     b->magic = SETTINGS_MAGIC;
-    memcpy(b->wifi_ssid, s_cfg.wifi_ssid, sizeof(b->wifi_ssid));
-    memcpy(b->wifi_pass, s_cfg.wifi_pass, sizeof(b->wifi_pass));
     memcpy(b->tz_name,   s_cfg.tz_name,   sizeof(b->tz_name));
     memcpy(b->tz_posix,  s_cfg.tz_posix,  sizeof(b->tz_posix));
     memcpy(b->hostname,  s_cfg.hostname,  sizeof(b->hostname));
@@ -61,8 +77,6 @@ static void pack_settings(settings_blob_t *b)
 
 static void unpack_settings(const settings_blob_t *b)
 {
-    memcpy(s_cfg.wifi_ssid, b->wifi_ssid, sizeof(s_cfg.wifi_ssid));
-    memcpy(s_cfg.wifi_pass, b->wifi_pass, sizeof(s_cfg.wifi_pass));
     memcpy(s_cfg.tz_name,   b->tz_name,   sizeof(s_cfg.tz_name));
     memcpy(s_cfg.tz_posix,  b->tz_posix,  sizeof(s_cfg.tz_posix));
     memcpy(s_cfg.hostname,  b->hostname,  sizeof(s_cfg.hostname));
@@ -95,6 +109,13 @@ void appstate_init(void)
     memset(&s_rt, 0, sizeof(s_rt));
     s_rt.macro_index = -1;   // no macro active
 
+    // Wi-Fi credentials load from their own blob (survive settings changes).
+    wifi_blob_t wbuf;
+    if (storage_get_blob(KEY_WIFI, &wbuf, sizeof(wbuf)) && wbuf.magic == WIFI_MAGIC) {
+        strlcpy(s_cfg.wifi_ssid, wbuf.ssid, sizeof(s_cfg.wifi_ssid));
+        strlcpy(s_cfg.wifi_pass, wbuf.pass, sizeof(s_cfg.wifi_pass));
+    }
+
     if (storage_get_blob(KEY_SETTINGS, &s_iobuf, sizeof(s_iobuf)) &&
         s_iobuf.magic == SETTINGS_MAGIC) {
         unpack_settings(&s_iobuf);
@@ -113,6 +134,7 @@ void appstate_init(void)
 
     // Prime shadows so the first save only writes if something actually changed.
     pack_settings(&s_shadow_settings);
+    pack_wifi(&s_shadow_wifi);
     memcpy(s_shadow_modes, s_cfg.relay_mode, sizeof(s_shadow_modes));
 }
 
@@ -132,6 +154,15 @@ void appstate_save_config(void)
         if (storage_set_blob(KEY_SETTINGS, &s_iobuf, sizeof(s_iobuf)) == ESP_OK) {
             memcpy(&s_shadow_settings, &s_iobuf, sizeof(s_iobuf));
             ESP_LOGI(TAG, "settings persisted");
+        }
+    }
+
+    wifi_blob_t wbuf;
+    pack_wifi(&wbuf);
+    if (memcmp(&wbuf, &s_shadow_wifi, sizeof(wbuf)) != 0) {
+        if (storage_set_blob(KEY_WIFI, &wbuf, sizeof(wbuf)) == ESP_OK) {
+            memcpy(&s_shadow_wifi, &wbuf, sizeof(wbuf));
+            ESP_LOGI(TAG, "wifi persisted");
         }
     }
 

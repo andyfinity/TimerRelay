@@ -247,8 +247,9 @@ $("#saveSchedule").addEventListener("click", async () => {
 async function loadConfig() {
   try {
     const c = await api("/api/config");
-    macros = (c.macros || []).map(m => ({ index: m.index, name: m.name || "",
-      steps: (m.steps || []).map(s => ({ delay: s.delay || 0, action: s.action || "on", relays: s.relays || [] })) }));
+    macros = (c.macros || []).map(m => ({ index: m.index, name: m.name || "", loop: m.loop != null ? m.loop : 1,
+      steps: (m.steps || []).map(s => ({ delay: s.delay || 0, call: s.call != null ? s.call : -1,
+        action: s.action || "on", relays: s.relays || [] })) }));
     events = (c.events || []).filter(e => e.type === "weekly");
     renderMacros();
     renderEvents();
@@ -263,23 +264,48 @@ function macroStepChips(step) {
 function stepRow(m, step, si) {
   const row = document.createElement("div");
   row.className = "mstep";
-  row.innerHTML = `
-    <div class="grp"><span>Wait (s)</span>
-      <input type="number" min="0" class="delayinput" value="${step.delay}" data-delay></div>
+  const isCall = step.call != null && step.call >= 0;
+  const callOpts = macros.length
+    ? macros.map(x => `<option value="${x.index}" ${step.call === x.index ? "selected" : ""}>${x.name || ("Macro " + x.index)}</option>`).join("")
+    : `<option value="">(no macros)</option>`;
+  const typeBlock = `
+    <div class="grp"><span>Do</span>
+      <select class="actsel" data-stype>
+        <option value="relays" ${!isCall ? "selected" : ""}>Set relays</option>
+        <option value="call" ${isCall ? "selected" : ""}>Call macro</option>
+      </select></div>`;
+  const relayBlock = `
     <div class="grp"><span>Relays</span><div class="chips" data-srelays>${macroStepChips(step)}</div></div>
     <div class="grp"><span>Action</span>
       <select class="actsel" data-saction>
         <option value="on" ${step.action === "on" ? "selected" : ""}>On (NO)</option>
         <option value="off" ${step.action === "off" ? "selected" : ""}>Off (NC)</option>
         <option value="auto" ${step.action === "auto" ? "selected" : ""}>Auto</option>
-      </select></div>
+      </select></div>`;
+  const callBlock = `<div class="grp"><span>Macro</span><select class="actsel" data-scall>${callOpts}</select></div>`;
+
+  row.innerHTML = `
+    <div class="grp"><span>Wait (s)</span>
+      <input type="number" min="0" class="delayinput" value="${step.delay}" data-delay></div>
+    ${typeBlock}
+    ${isCall ? callBlock : relayBlock}
     <button class="del" data-delstep>Delete</button>`;
+
   $("[data-delay]", row).addEventListener("change", ev => step.delay = Math.max(0, +ev.target.value || 0));
-  $$("[data-srelays] .chip", row).forEach(c => c.addEventListener("click", () => {
-    const r = +c.dataset.srelay; c.classList.toggle("sel");
-    step.relays = c.classList.contains("sel") ? [...step.relays, r] : step.relays.filter(x => x !== r);
-  }));
-  $("[data-saction]", row).addEventListener("change", ev => step.action = ev.target.value);
+  $("[data-stype]", row).addEventListener("change", ev => {
+    step.call = ev.target.value === "call" ? (macros.length ? macros[0].index : 0) : -1;
+    renderMacros();
+  });
+  if (isCall) {
+    const cs = $("[data-scall]", row);
+    if (cs && macros.length) { step.call = +cs.value; cs.addEventListener("change", ev => step.call = +ev.target.value); }
+  } else {
+    $$("[data-srelays] .chip", row).forEach(c => c.addEventListener("click", () => {
+      const r = +c.dataset.srelay; c.classList.toggle("sel");
+      step.relays = c.classList.contains("sel") ? [...step.relays, r] : step.relays.filter(x => x !== r);
+    }));
+    $("[data-saction]", row).addEventListener("change", ev => step.action = ev.target.value);
+  }
   $("[data-delstep]", row).addEventListener("click", () => { m.steps.splice(si, 1); renderMacros(); });
   return row;
 }
@@ -289,6 +315,8 @@ function macroCard(m, mi) {
   div.innerHTML = `
     <div class="mhead">
       <input class="mname" value="${m.name || ""}" placeholder="Macro name" data-name>
+      <label class="mloop" title="Number of passes over the steps; 0 = forever">Loop
+        <input type="number" min="0" class="loopinput" value="${m.loop != null ? m.loop : 1}" data-loop> ×</label>
       <div class="mbtns">
         <button class="btn" data-run>▶ Run</button>
         <button class="btn" data-step>⏭ Step</button>
@@ -299,10 +327,11 @@ function macroCard(m, mi) {
     <div class="steps" data-steps></div>
     <button class="btn addstep" data-addstep>+ Add step</button>`;
   $("[data-name]", div).addEventListener("change", ev => m.name = ev.target.value);
+  $("[data-loop]", div).addEventListener("change", ev => m.loop = Math.max(0, +ev.target.value || 0));
   const steps = $("[data-steps]", div);
   if (!m.steps.length) steps.innerHTML = `<p class="hint">No steps yet.</p>`;
   m.steps.forEach((s, si) => steps.appendChild(stepRow(m, s, si)));
-  $("[data-addstep]", div).addEventListener("click", () => { m.steps.push({ delay: 5, action: "on", relays: [] }); renderMacros(); });
+  $("[data-addstep]", div).addEventListener("click", () => { m.steps.push({ delay: 5, call: -1, action: "on", relays: [] }); renderMacros(); });
   $("[data-delmacro]", div).addEventListener("click", () => { macros.splice(mi, 1); renderMacros(); renderEvents(); });
   $("[data-run]", div).addEventListener("click", () => macroControl("start", mi));
   $("[data-step]", div).addEventListener("click", () => macroControl("step", mi));
@@ -317,14 +346,16 @@ function renderMacros() {
   macros.forEach((m, i) => list.appendChild(macroCard(m, i)));
 }
 function macrosPayload() {
-  return { macros: macros.map(m => ({ name: m.name,
-    steps: m.steps.map(s => ({ delay: +s.delay || 0, action: s.action, relays: s.relays })) })) };
+  const toStep = s => (s.call != null && s.call >= 0)
+    ? { delay: +s.delay || 0, call: s.call }
+    : { delay: +s.delay || 0, action: s.action, relays: s.relays };
+  return { macros: macros.map(m => ({ name: m.name, loop: m.loop != null ? m.loop : 1, steps: m.steps.map(toStep) })) };
 }
 async function saveMacros(silent) {
   await post("/api/macros", macrosPayload());
   if (!silent) flash($("#macroMsg"), "Macros saved.");
 }
-$("#addMacro").addEventListener("click", () => { macros.push({ index: macros.length, name: "", steps: [] }); renderMacros(); });
+$("#addMacro").addEventListener("click", () => { macros.push({ index: macros.length, name: "", loop: 1, steps: [] }); renderMacros(); });
 $("#saveMacros").addEventListener("click", async () => {
   try { await saveMacros(false); await loadConfig(); }
   catch (e) { flash($("#macroMsg"), "Failed: " + e.message, false); }

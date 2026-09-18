@@ -20,6 +20,7 @@ extern "C" {
 #define MAX_MACROS           8
 #define MAX_MACRO_STEPS      24
 #define MACRO_NAME_MAX       24
+#define MACRO_CALL_DEPTH     8    // max nested macro-call depth (recursion guard)
 #define WIFI_SSID_MAX        33   // 32 + NUL
 #define WIFI_PASS_MAX        64   // 63 + NUL
 #define TZ_NAME_MAX          40   // human-selectable region key
@@ -82,19 +83,23 @@ typedef struct {
 
 // --- Macro model -----------------------------------------------------------
 // A macro is a named, ordered list of steps. Each step waits delay_s seconds
-// (relative to the previous step) and then applies `action` to its relay_mask.
+// (relative to the previous step) and then either applies `action` to its
+// relay_mask (call_macro < 0) or runs another macro inline (call_macro >= 0).
+// A macro's whole step sequence repeats `loop_count` times (0 = forever).
 // Macros manipulate relay override modes only - the controller remains the sole
 // writer of the physical outputs. Step timing is monotonic, so macros run even
 // when the wall clock is not yet valid.
 typedef struct {
     uint16_t delay_s;      // seconds to wait before this step (>= 0)
-    uint8_t  relay_mask;   // bit0..bit5 -> relay 1..6 this step acts on
+    uint8_t  relay_mask;   // bit0..bit5 -> relay 1..6 (when call_macro < 0)
     uint8_t  action;       // relay_mode_t applied to the masked relays
+    int8_t   call_macro;   // -1 = relay action; >=0 = run that macro inline
 } macro_step_t;
 
 typedef struct {
     bool         used;
     char         name[MACRO_NAME_MAX];
+    uint16_t     loop_count;   // number of passes over the steps; 0 = infinite
     uint8_t      step_count;
     macro_step_t steps[MAX_MACRO_STEPS];
 } macro_t;
