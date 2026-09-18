@@ -14,6 +14,10 @@ function getVariableDefinitions(relayCount) {
 	defs.push({ variableId: 'ip', name: 'IP address' })
 	defs.push({ variableId: 'local_time', name: 'Device local time' })
 	defs.push({ variableId: 'timezone', name: 'Timezone name' })
+	defs.push({ variableId: 'macro_active', name: 'Macro running (yes/no)' })
+	defs.push({ variableId: 'macro_name', name: 'Active macro name' })
+	defs.push({ variableId: 'macro_step', name: 'Active macro step (x/y)' })
+	defs.push({ variableId: 'macro_run', name: 'Active macro run mode' })
 	return defs
 }
 

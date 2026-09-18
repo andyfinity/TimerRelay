@@ -11,6 +11,11 @@ Companion module. Built with **ESP-IDF v6.0.2**.
   model already carries daily / monthly / yearly / one-time recurrence for future
   expansion; the evaluator implements all of them.
 - **Per-relay override**: On / Auto / Off, from the web UI, REST API, or Companion.
+- **Macros**: named, timed sequences of relay actions with an arbitrary per-step
+  delay (e.g. relay 1 on, wait 5 s, relay 2 on, wait 10 s, both off). Startable
+  from the web UI, REST API, a schedule event, or Companion (start / stop / step,
+  with active-macro feedback). Step timing is monotonic, so macros run even
+  before the clock is valid.
 - **Timekeeping** via NTP over Wi-Fi, with a manual-set fallback and a curated,
   DST-correct timezone list (POSIX TZ strings).
 - **Networking**: joins your Wi-Fi as a station; if none is configured or the join
@@ -66,6 +71,8 @@ Quick reference:
 | GET  | `/api/tzlist`   | — | Available timezones |
 | POST | `/api/relay`    | `{"relay":1-6,"mode":"on\|auto\|off"}` | Set override |
 | POST | `/api/schedule` | `{"events":[…]}` | Replace schedule |
+| POST | `/api/macros`   | `{"macros":[…]}` | Replace macro definitions |
+| POST | `/api/macro`    | `{"action":"start\|stop\|step","macro":<idx\|name>}` | Control a macro |
 | POST | `/api/time`     | `{"epoch":<utc>}` | Manual time set |
 | POST | `/api/timezone` | `{"name":"America/New_York"}` | Set timezone |
 | POST | `/api/wifi`     | `{"ssid":"…","pass":"…"}` | Set Wi-Fi + reconnect |
@@ -144,6 +151,32 @@ again you add a second `"action":"off"` event at the later time.
 
 ```bash
 curl -X POST http://timerrelay.local/api/schedule -H 'Content-Type: application/json' -d '{"events":[{"enabled":true,"type":"weekly","action":"on","relays":[1,2],"dow":[1,2,3,4,5],"hour":8,"minute":0,"second":0}]}'
+```
+
+Each event also carries a **`target`**: `"relays"` (default — the level-based
+behaviour above) or `"macro"`, in which case the event starts macro **`macro`**
+(a slot index) at its scheduled second instead of driving relays.
+
+### POST `/api/macros` — replace all macro definitions
+
+Body: `{"macros":[{"name":"…","steps":[{"delay":<s>,"action":"on|off|auto","relays":[…]}]}]}`.
+Each step waits `delay` seconds (relative to the previous step) then applies
+`action` to its relays. Slot index = array position; schedule events reference
+macros by that index. Up to 8 macros × 24 steps.
+
+```bash
+curl -X POST http://timerrelay.local/api/macros -H 'Content-Type: application/json' -d '{"macros":[{"name":"Startup","steps":[{"delay":0,"action":"on","relays":[1]},{"delay":5,"action":"on","relays":[2]},{"delay":10,"action":"off","relays":[1,2]}]}]}'
+```
+
+### POST `/api/macro` — start / stop / step a macro
+
+Body: `{"action":"start"|"stop"|"step","macro":<index or name>}`. `start` auto-runs
+the macro; `step` advances one step (and holds); `stop` ends it. The live macro
+state appears in `/api/status` under a `macro` object
+(`active`, `index`, `name`, `step`, `steps`, `run`).
+
+```bash
+curl -X POST http://timerrelay.local/api/macro -H 'Content-Type: application/json' -d '{"action":"start","macro":"Startup"}'
 ```
 
 ### POST `/api/time` — set the clock manually

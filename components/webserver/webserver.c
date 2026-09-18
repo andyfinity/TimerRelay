@@ -5,6 +5,7 @@
 #include "timekeeper.h"
 #include "netmgr.h"
 #include "controller.h"
+#include "macros.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -15,7 +16,8 @@
 static const char *TAG = "web";
 static httpd_handle_t s_httpd;
 
-#define MAX_BODY 8192
+// Big enough for a full schedule or macro-set payload.
+#define MAX_BODY 16384
 
 // --- Embedded static assets (see component CMakeLists EMBED_FILES) ----------
 extern const char index_html_start[] asm("_binary_index_html_start");
@@ -57,6 +59,32 @@ static const char *mode_to_str(uint8_t m)
         case RELAY_MODE_OFF: return "off";
         default:             return "auto";
     }
+}
+
+static uint8_t str_to_mode(const char *s)
+{
+    if (s) {
+        if (!strcmp(s, "on"))  return RELAY_MODE_ON;
+        if (!strcmp(s, "off")) return RELAY_MODE_OFF;
+    }
+    return RELAY_MODE_AUTO;
+}
+
+// Resolve a macro name to its config slot index, or -1 if not found.
+static int macro_index_by_name(const char *name)
+{
+    if (!name) return -1;
+    int idx = -1;
+    appstate_lock();
+    app_config_t *cfg = appstate_config();
+    for (int i = 0; i < MAX_MACROS; i++) {
+        if (cfg->macros[i].used && strcmp(cfg->macros[i].name, name) == 0) {
+            idx = i;
+            break;
+        }
+    }
+    appstate_unlock();
+    return idx;
 }
 
 static const char *report_to_str(uint8_t r)
@@ -169,6 +197,15 @@ static esp_err_t h_status(httpd_req_t *req)
         cJSON_AddBoolToObject(o, "physical", rt->relay_physical[r]);
         cJSON_AddItemToArray(relays, o);
     }
+
+    cJSON *mac = cJSON_AddObjectToObject(root, "macro");
+    cJSON_AddBoolToObject(mac, "active", rt->macro_active);
+    cJSON_AddNumberToObject(mac, "index", rt->macro_index);
+    cJSON_AddStringToObject(mac, "name", rt->macro_name);
+    cJSON_AddNumberToObject(mac, "step", rt->macro_step);
+    cJSON_AddNumberToObject(mac, "steps", rt->macro_steps_total);
+    cJSON_AddStringToObject(mac, "run",
+                            rt->macro_run == MACRO_RUN_MANUAL ? "manual" : "auto");
     appstate_unlock();
 
     return send_json(req, root);
@@ -208,6 +245,9 @@ static void event_to_json(const sched_event_t *e, cJSON *o)
     cJSON_AddNumberToObject(o, "day", e->day);
     cJSON_AddNumberToObject(o, "month", e->month);
     cJSON_AddNumberToObject(o, "year", e->year);
+    cJSON_AddStringToObject(o, "target",
+                            e->target == SCHED_TARGET_MACRO ? "macro" : "relays");
+    cJSON_AddNumberToObject(o, "macro", e->macro_idx);
 }
 
 static esp_err_t h_get_config(httpd_req_t *req)
@@ -223,6 +263,28 @@ static esp_err_t h_get_config(httpd_req_t *req)
         cJSON *o = cJSON_CreateObject();
         event_to_json(&cfg->events[i], o);
         cJSON_AddItemToArray(evs, o);
+    }
+
+    cJSON *macs = cJSON_AddArrayToObject(root, "macros");
+    for (int mi = 0; mi < MAX_MACROS; mi++) {
+        const macro_t *m = &cfg->macros[mi];
+        if (!m->used) continue;
+        cJSON *mo = cJSON_CreateObject();
+        cJSON_AddNumberToObject(mo, "index", mi);
+        cJSON_AddStringToObject(mo, "name", m->name);
+        cJSON *steps = cJSON_AddArrayToObject(mo, "steps");
+        for (int s = 0; s < m->step_count; s++) {
+            const macro_step_t *st = &m->steps[s];
+            cJSON *so = cJSON_CreateObject();
+            cJSON_AddNumberToObject(so, "delay", st->delay_s);
+            cJSON_AddStringToObject(so, "action", mode_to_str(st->action));
+            cJSON *sr = cJSON_AddArrayToObject(so, "relays");
+            for (int r = 0; r < RELAY_COUNT; r++)
+                if (st->relay_mask & (1u << r))
+                    cJSON_AddItemToArray(sr, cJSON_CreateNumber(r + 1));
+            cJSON_AddItemToArray(steps, so);
+        }
+        cJSON_AddItemToArray(macs, mo);
     }
     appstate_unlock();
     return send_json(req, root);
@@ -304,6 +366,17 @@ static void json_to_event(cJSON *o, sched_event_t *e)
     GETI("month",  1, 12, e->month);
     GETI("year",   1970, 2100, e->year);
     #undef GETI
+
+    const char *tgt = cJSON_GetStringValue(cJSON_GetObjectItem(o, "target"));
+    e->target = (tgt && !strcmp(tgt, "macro")) ? SCHED_TARGET_MACRO
+                                               : SCHED_TARGET_RELAYS;
+    cJSON *jmi = cJSON_GetObjectItem(o, "macro");
+    if (cJSON_IsNumber(jmi)) {
+        int mi = jmi->valueint;
+        if (mi < 0) mi = 0;
+        if (mi >= MAX_MACROS) mi = MAX_MACROS - 1;
+        e->macro_idx = (uint8_t)mi;
+    }
 }
 
 static esp_err_t h_set_schedule(httpd_req_t *req)
@@ -332,6 +405,111 @@ static esp_err_t h_set_schedule(httpd_req_t *req)
     controller_notify();
 
     cJSON_Delete(j);
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"ok\":true}");
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/macros   {macros:[ {name, steps:[{delay, action, relays:[]}]} ]}
+// Replaces all macro definitions. Slot index = array position (schedule events
+// reference macros by that index).
+// ---------------------------------------------------------------------------
+static void json_to_macro(cJSON *mo, macro_t *m)
+{
+    memset(m, 0, sizeof(*m));
+    m->used = true;
+    const char *nm = cJSON_GetStringValue(cJSON_GetObjectItem(mo, "name"));
+    strlcpy(m->name, nm ? nm : "", sizeof(m->name));
+
+    cJSON *steps = cJSON_GetObjectItem(mo, "steps");
+    int sc = 0, v_i;
+    cJSON *so;
+    cJSON_ArrayForEach(so, steps) {
+        if (sc >= MAX_MACRO_STEPS) break;
+        macro_step_t *st = &m->steps[sc];
+        cJSON *jd = cJSON_GetObjectItem(so, "delay");
+        int d = cJSON_IsNumber(jd) ? jd->valueint : 0;
+        if (d < 0) d = 0;
+        if (d > 65535) d = 65535;
+        st->delay_s = (uint16_t)d;
+        st->action = str_to_mode(cJSON_GetStringValue(cJSON_GetObjectItem(so, "action")));
+        cJSON *sr = cJSON_GetObjectItem(so, "relays");
+        cJSON *v;
+        cJSON_ArrayForEach(v, sr) {
+            v_i = v->valueint;
+            if (v_i >= 1 && v_i <= RELAY_COUNT) st->relay_mask |= (1u << (v_i - 1));
+        }
+        sc++;
+    }
+    m->step_count = (uint8_t)sc;
+}
+
+static esp_err_t h_set_macros(httpd_req_t *req)
+{
+    char *body = read_body(req);
+    if (!body) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "body"); return ESP_FAIL; }
+    cJSON *j = cJSON_Parse(body);
+    free(body);
+    if (!j) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "json"); return ESP_FAIL; }
+
+    cJSON *macs = cJSON_GetObjectItem(j, "macros");
+    if (!cJSON_IsArray(macs)) { cJSON_Delete(j); httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "macros"); return ESP_FAIL; }
+
+    appstate_lock();
+    app_config_t *cfg = appstate_config();
+    for (int i = 0; i < MAX_MACROS; i++) {
+        cfg->macros[i].used = false;
+        cfg->macros[i].step_count = 0;
+    }
+    int n = 0;
+    cJSON *mo;
+    cJSON_ArrayForEach(mo, macs) {
+        if (n >= MAX_MACROS) break;
+        json_to_macro(mo, &cfg->macros[n]);
+        n++;
+    }
+    cfg->macro_count = (uint8_t)n;
+    appstate_unlock();
+    appstate_save_config();
+    controller_notify();
+
+    cJSON_Delete(j);
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"ok\":true}");
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/macro   {action:"start|stop|step", macro:<index|name>}
+// ---------------------------------------------------------------------------
+static esp_err_t h_macro_ctl(httpd_req_t *req)
+{
+    char *body = read_body(req);
+    if (!body) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "body"); return ESP_FAIL; }
+    cJSON *j = cJSON_Parse(body);
+    free(body);
+    if (!j) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "json"); return ESP_FAIL; }
+
+    const char *act = cJSON_GetStringValue(cJSON_GetObjectItem(j, "action"));
+    cJSON *jm = cJSON_GetObjectItem(j, "macro");
+    int idx = -1;
+    if (cJSON_IsNumber(jm)) idx = jm->valueint;
+    else if (cJSON_IsString(jm)) idx = macro_index_by_name(jm->valuestring);
+
+    bool ok = false;
+    if (act && !strcmp(act, "start")) {
+        ok = macros_start(idx, MACRO_RUN_AUTO);
+        controller_notify();
+    } else if (act && !strcmp(act, "stop")) {
+        macros_stop();
+        controller_notify();
+        ok = true;
+    } else if (act && !strcmp(act, "step")) {
+        ok = macros_step(idx);   // idx < 0 steps the active macro
+        controller_notify();
+    }
+    cJSON_Delete(j);
+
+    if (!ok) { httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "action/macro"); return ESP_FAIL; }
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
@@ -450,6 +628,8 @@ void webserver_start(void)
     reg(s_httpd, "/api/tzlist", HTTP_GET, h_tzlist);
     reg(s_httpd, "/api/relay", HTTP_POST, h_set_relay);
     reg(s_httpd, "/api/schedule", HTTP_POST, h_set_schedule);
+    reg(s_httpd, "/api/macros", HTTP_POST, h_set_macros);
+    reg(s_httpd, "/api/macro", HTTP_POST, h_macro_ctl);
     reg(s_httpd, "/api/time", HTTP_POST, h_set_time);
     reg(s_httpd, "/api/timezone", HTTP_POST, h_set_tz);
     reg(s_httpd, "/api/wifi", HTTP_POST, h_set_wifi);

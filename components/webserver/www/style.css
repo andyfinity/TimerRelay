@@ -156,6 +156,31 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .switch input:checked + .track { background: var(--accent); border-color: var(--accent); }
 .switch input:checked + .track::after { transform: translateX(18px); background: #fff; }
 
+/* Macros */
+.macro-active {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px; font-size: 14px;
+}
+.macro-active .btn { margin-left: auto; padding: 6px 12px; }
+.macro-list { display: flex; flex-direction: column; gap: 14px; }
+.macro {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 14px;
+}
+.mhead { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.mname { flex: 1; min-width: 160px; font-weight: 600; }
+.mbtns { display: flex; gap: 6px; flex-wrap: wrap; }
+.mbtns .btn { padding: 8px 12px; }
+.steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.mstep {
+  display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+}
+.mstep .del { margin-left: auto; }
+.delayinput { width: 90px; }
+.addstep { width: 100%; }
+
 .msg { min-height: 20px; font-size: 13px; margin-top: 10px; }
 .msg.ok { color: var(--green); }
 .msg.err { color: var(--red); }

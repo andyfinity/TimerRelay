@@ -7,7 +7,14 @@ const MODE_CHOICES = [
 	{ id: 'off', label: 'Off (manual override, de-energized / NC)' },
 ]
 
+// Macro choices come from the device (refreshed by main.js); fall back to a
+// placeholder so the dropdown is never empty.
+function macroChoices(self) {
+	return self.macros && self.macros.length ? self.macros : [{ id: 0, label: '(no macros defined)' }]
+}
+
 function getActions(self) {
+	const macros = macroChoices(self)
 	return {
 		set_relay_mode: {
 			name: 'Set relay mode',
@@ -40,6 +47,30 @@ function getActions(self) {
 				for (let i = 1; i <= 6; i++) {
 					await self.setRelayMode(i, action.options.mode)
 				}
+			},
+		},
+
+		// --- Macros ---
+		macro_start: {
+			name: 'Macro: start',
+			options: [{ type: 'dropdown', id: 'macro', label: 'Macro', default: macros[0].id, choices: macros }],
+			callback: async (action) => {
+				await self.macroControl('start', action.options.macro)
+			},
+		},
+		macro_step: {
+			name: 'Macro: step (advance one step)',
+			description: 'Advance the running macro one step; if none is running, start the selected macro paused at its first step.',
+			options: [{ type: 'dropdown', id: 'macro', label: 'Macro (used only if none running)', default: macros[0].id, choices: macros }],
+			callback: async (action) => {
+				await self.macroControl('step', action.options.macro)
+			},
+		},
+		macro_stop: {
+			name: 'Macro: stop',
+			options: [],
+			callback: async () => {
+				await self.macroControl('stop')
 			},
 		},
 	}

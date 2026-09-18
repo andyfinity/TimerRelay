@@ -17,10 +17,11 @@ Target is `esp32c6`. `sdkconfig` is generated from `sdkconfig.defaults`
 (don't commit `sdkconfig`).
 
 ## Architecture (one-way dependency flow)
-`main` → `webserver`/`netmgr`/`controller` → `schedule`/`timekeeper`/`relays` →
-`appstate` → `storage`. `appstate` is the single source of truth: a mutex plus a
-persisted `app_config_t` and a volatile `app_runtime_t`. Take `appstate_lock()`
-around any access; keep critical sections short (the lock is recursive).
+`main` → `webserver`/`netmgr`/`controller` → `schedule`/`timekeeper`/`relays`/
+`macros` → `appstate` → `storage`. `appstate` is the single source of truth: a
+mutex plus a persisted `app_config_t` and a volatile `app_runtime_t`. Take
+`appstate_lock()` around any access; keep critical sections short (recursive lock).
+`webserver` also depends on `macros`; `controller` drives `macros` each tick.
 
 ## Key invariants — keep these true
 - **Relays are active-HIGH**; low = disabled (NC) = safe default. The GPIO map
@@ -42,6 +43,17 @@ around any access; keep critical sections short (the lock is recursive).
 relays to `action`. A relay's auto state = the most recently fired applicable
 event. WEEKLY is exposed in the UI; the evaluator already handles daily/monthly/
 yearly/oneshot — surface them in the UI without touching the core when needed.
+
+## Macros
+A macro (`macro_t` in `appstate.h`) is a named list of steps; each step waits
+`delay_s` seconds then applies an override mode (`on`/`off`/`auto`) to a relay
+mask. The engine (`components/macros/`) only mutates override modes — the
+controller still owns the outputs — and times steps with `esp_timer` (monotonic),
+so macros run without a valid wall clock. One macro is active at a time. The
+controller calls `macros_tick()` each tick (auto-advance) and edge-fires
+macro-target schedule events via `schedule_collect_macro_starts()`; webserver/REST
+call `macros_start/stop/step` then `controller_notify()`. Keep macros off GPIO and
+off wall-clock time. A schedule event's `target` selects relays vs. a macro.
 
 ## Web UI
 Embedded from `components/webserver/www/` via `EMBED_FILES` (symbols like

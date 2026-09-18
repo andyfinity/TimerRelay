@@ -11,6 +11,7 @@ const REPORT_CHOICES = [
 ]
 
 function getFeedbacks(self) {
+	const macros = self.macros && self.macros.length ? self.macros : [{ id: 0, label: '(no macros defined)' }]
 	return {
 		// The core feedback requested: match one of the four reported states.
 		relay_state: {
@@ -79,6 +80,24 @@ function getFeedbacks(self) {
 			defaultStyle: { bgcolor: combineRgb(0, 100, 160), color: combineRgb(255, 255, 255) },
 			options: [],
 			callback: () => self.state.ntp_reachable,
+		},
+
+		macro_active: {
+			type: 'boolean',
+			name: 'A macro is running',
+			description: 'True while any macro is active.',
+			defaultStyle: { bgcolor: combineRgb(120, 80, 200), color: combineRgb(255, 255, 255) },
+			options: [],
+			callback: () => self.state.macro_active,
+		},
+		macro_running: {
+			type: 'boolean',
+			name: 'Specific macro is running',
+			description: 'True when the selected macro is the active one.',
+			defaultStyle: { bgcolor: combineRgb(120, 80, 200), color: combineRgb(255, 255, 255) },
+			options: [{ type: 'dropdown', id: 'macro', label: 'Macro', default: macros[0].id, choices: macros }],
+			callback: (fb) =>
+				self.state.macro_active && Number(self.state.macro_index) === Number(fb.options.macro),
 		},
 	}
 }

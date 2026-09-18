@@ -25,9 +25,12 @@ typedef struct {
     char     hostname[HOSTNAME_MAX];
     uint16_t event_count;
     sched_event_t events[MAX_SCHEDULE_EVENTS];
+    uint8_t  macro_count;
+    macro_t  macros[MAX_MACROS];
 } settings_blob_t;
 
-#define SETTINGS_MAGIC 0x54524C31u  // "TRL1"
+// Bumped to TRL2 when macros + schedule targets were added to the blob layout.
+#define SETTINGS_MAGIC 0x54524C32u  // "TRL2"
 
 static SemaphoreHandle_t s_mutex;
 static app_config_t      s_cfg;
@@ -36,6 +39,10 @@ static app_runtime_t     s_rt;
 // Shadows of what is currently on flash, for write-on-change comparison.
 static settings_blob_t   s_shadow_settings;
 static uint8_t           s_shadow_modes[RELAY_COUNT];
+
+// Scratch blob buffer. The struct is a few KB; keep it off the (smaller) task
+// stacks. Only ever touched while the appstate lock is held.
+static settings_blob_t   s_iobuf;
 
 static void pack_settings(settings_blob_t *b)
 {
@@ -48,6 +55,8 @@ static void pack_settings(settings_blob_t *b)
     memcpy(b->hostname,  s_cfg.hostname,  sizeof(b->hostname));
     b->event_count = s_cfg.event_count;
     memcpy(b->events, s_cfg.events, sizeof(b->events));
+    b->macro_count = s_cfg.macro_count;
+    memcpy(b->macros, s_cfg.macros, sizeof(b->macros));
 }
 
 static void unpack_settings(const settings_blob_t *b)
@@ -60,6 +69,8 @@ static void unpack_settings(const settings_blob_t *b)
     s_cfg.event_count = b->event_count > MAX_SCHEDULE_EVENTS
                             ? MAX_SCHEDULE_EVENTS : b->event_count;
     memcpy(s_cfg.events, b->events, sizeof(s_cfg.events));
+    s_cfg.macro_count = b->macro_count > MAX_MACROS ? MAX_MACROS : b->macro_count;
+    memcpy(s_cfg.macros, b->macros, sizeof(s_cfg.macros));
 }
 
 static void load_defaults(void)
@@ -82,12 +93,13 @@ void appstate_init(void)
 
     load_defaults();
     memset(&s_rt, 0, sizeof(s_rt));
+    s_rt.macro_index = -1;   // no macro active
 
-    settings_blob_t sb;
-    if (storage_get_blob(KEY_SETTINGS, &sb, sizeof(sb)) && sb.magic == SETTINGS_MAGIC) {
-        unpack_settings(&sb);
-        ESP_LOGI(TAG, "loaded settings (%u events, ssid='%s', tz='%s')",
-                 s_cfg.event_count, s_cfg.wifi_ssid, s_cfg.tz_name);
+    if (storage_get_blob(KEY_SETTINGS, &s_iobuf, sizeof(s_iobuf)) &&
+        s_iobuf.magic == SETTINGS_MAGIC) {
+        unpack_settings(&s_iobuf);
+        ESP_LOGI(TAG, "loaded settings (%u events, %u macros, ssid='%s', tz='%s')",
+                 s_cfg.event_count, s_cfg.macro_count, s_cfg.wifi_ssid, s_cfg.tz_name);
     } else {
         ESP_LOGW(TAG, "no valid settings in NVS; using defaults");
     }
@@ -115,11 +127,10 @@ void appstate_save_config(void)
     // Caller may or may not hold the lock; take it recursively to be safe.
     appstate_lock();
 
-    settings_blob_t sb;
-    pack_settings(&sb);
-    if (memcmp(&sb, &s_shadow_settings, sizeof(sb)) != 0) {
-        if (storage_set_blob(KEY_SETTINGS, &sb, sizeof(sb)) == ESP_OK) {
-            memcpy(&s_shadow_settings, &sb, sizeof(sb));
+    pack_settings(&s_iobuf);
+    if (memcmp(&s_iobuf, &s_shadow_settings, sizeof(s_iobuf)) != 0) {
+        if (storage_set_blob(KEY_SETTINGS, &s_iobuf, sizeof(s_iobuf)) == ESP_OK) {
+            memcpy(&s_shadow_settings, &s_iobuf, sizeof(s_iobuf));
             ESP_LOGI(TAG, "settings persisted");
         }
     }

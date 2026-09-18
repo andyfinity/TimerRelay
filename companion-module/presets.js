@@ -4,7 +4,7 @@ const { combineRgb } = require('@companion-module/base')
 
 // One preset row per relay: On / Auto / Off buttons that also colour themselves
 // from the live reported state.
-function getPresets(relayCount) {
+function getPresets(relayCount, macros = []) {
 	const presets = {}
 	const white = combineRgb(255, 255, 255)
 	const black = combineRgb(0, 0, 0)
@@ -61,6 +61,39 @@ function getPresets(relayCount) {
 				},
 			],
 		}
+	}
+
+	// --- Macro presets ---
+	const purple = combineRgb(120, 80, 200)
+	for (const m of macros) {
+		presets[`macro_start_${m.id}`] = {
+			type: 'button',
+			category: 'Macros',
+			name: `Start: ${m.label}`,
+			style: { text: `▶\\n${m.label}`, size: '14', color: white, bgcolor: black },
+			steps: [{ down: [{ actionId: 'macro_start', options: { macro: m.id } }], up: [] }],
+			feedbacks: [
+				{ feedbackId: 'macro_running', options: { macro: m.id }, style: { bgcolor: purple, color: white } },
+			],
+		}
+		presets[`macro_step_${m.id}`] = {
+			type: 'button',
+			category: 'Macros',
+			name: `Step: ${m.label}`,
+			style: { text: `⏭\\n${m.label}`, size: '14', color: white, bgcolor: black },
+			steps: [{ down: [{ actionId: 'macro_step', options: { macro: m.id } }], up: [] }],
+			feedbacks: [],
+		}
+	}
+	presets['macro_stop'] = {
+		type: 'button',
+		category: 'Macros',
+		name: 'Stop macro',
+		style: { text: '■\\nSTOP', size: '18', color: white, bgcolor: black },
+		steps: [{ down: [{ actionId: 'macro_stop', options: {} }], up: [] }],
+		feedbacks: [
+			{ feedbackId: 'macro_active', options: {}, style: { bgcolor: combineRgb(150, 40, 40), color: white } },
+		],
 	}
 
 	return presets

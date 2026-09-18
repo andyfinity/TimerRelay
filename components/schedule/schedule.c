@@ -102,7 +102,9 @@ void schedule_eval(time_t now, bool auto_on[RELAY_COUNT])
 
     for (uint16_t i = 0; i < n; i++) {
         const sched_event_t *e = &cfg->events[i];
-        if (!e->enabled || e->relay_mask == 0) continue;
+        if (!e->enabled) continue;
+        if (e->target == SCHED_TARGET_MACRO) continue;   // edges, not levels
+        if (e->relay_mask == 0) continue;
 
         time_t ts;
         if (!last_occurrence(e, now, &lt, &ts)) continue;
@@ -118,4 +120,29 @@ void schedule_eval(time_t now, bool auto_on[RELAY_COUNT])
         }
     }
     appstate_unlock();
+}
+
+int schedule_collect_macro_starts(time_t now, time_t since, uint8_t *out, int max)
+{
+    struct tm lt;
+    localtime_r(&now, &lt);
+
+    int count = 0;
+    appstate_lock();
+    app_config_t *cfg = appstate_config();
+    uint16_t n = cfg->event_count;
+    if (n > MAX_SCHEDULE_EVENTS) n = MAX_SCHEDULE_EVENTS;
+
+    for (uint16_t i = 0; i < n && count < max; i++) {
+        const sched_event_t *e = &cfg->events[i];
+        if (!e->enabled || e->target != SCHED_TARGET_MACRO) continue;
+
+        time_t ts;
+        if (!last_occurrence(e, now, &lt, &ts)) continue;
+        if (ts > since && ts <= now) {
+            out[count++] = e->macro_idx;
+        }
+    }
+    appstate_unlock();
+    return count;
 }

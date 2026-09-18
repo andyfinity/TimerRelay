@@ -21,7 +21,15 @@ extern "C" {
 // Compute the desired auto (schedule-driven) on/off state for every relay at
 // local epoch time `now`. Requires the TZ environment to be set (timekeeper
 // does this) so recurrence math is DST-correct. Reads config under the lock.
+// Only relay-target events contribute; macro-target events are handled as edges
+// (see schedule_collect_macro_starts).
 void schedule_eval(time_t now, bool auto_on[RELAY_COUNT]);
+
+// Collect macro-target schedule events that fired in the window (since, now].
+// Fills out[] with up to `max` macro indices (each such event fires at most
+// once, at its most recent occurrence) and returns the count. Edge-triggered:
+// the caller advances `since` to `now` between calls.
+int schedule_collect_macro_starts(time_t now, time_t since, uint8_t *out, int max);
 
 #ifdef __cplusplus
 }

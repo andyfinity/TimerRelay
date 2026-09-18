@@ -17,6 +17,9 @@ extern "C" {
 
 #define RELAY_COUNT          6
 #define MAX_SCHEDULE_EVENTS  64
+#define MAX_MACROS           8
+#define MAX_MACRO_STEPS      24
+#define MACRO_NAME_MAX       24
 #define WIFI_SSID_MAX        33   // 32 + NUL
 #define WIFI_PASS_MAX        64   // 63 + NUL
 #define TZ_NAME_MAX          40   // human-selectable region key
@@ -50,9 +53,17 @@ typedef enum {
     SCHED_ONESHOT = 4,   // uses year + month + day + hh:mm:ss (absolute)
 } sched_type_t;
 
-// A schedule event is a *transition*: at its time it sets the target relays to
-// `action` (1 = enabled/NO, 0 = disabled/NC). A relay's auto state is decided by
-// the most recently fired applicable event (see schedule.c).
+// What a schedule event acts on when it fires.
+typedef enum {
+    SCHED_TARGET_RELAYS = 0,  // level-based: drive relay_mask to `action`
+    SCHED_TARGET_MACRO  = 1,  // edge-triggered: start macro `macro_idx` once
+} sched_target_t;
+
+// A schedule event is a *transition*. For SCHED_TARGET_RELAYS it sets the target
+// relays to `action` (1 = enabled/NO, 0 = disabled/NC); a relay's auto state is
+// decided by the most recently fired applicable event (see schedule.c). For
+// SCHED_TARGET_MACRO it starts macro `macro_idx` at the scheduled second (an
+// edge, fired once as local time crosses the event time).
 typedef struct {
     bool     enabled;
     uint8_t  relay_mask;   // bit0..bit5 -> relay 1..6 this event applies to
@@ -65,7 +76,34 @@ typedef struct {
     uint8_t  minute;       // 0..59
     uint8_t  second;       // 0..59
     int16_t  year;         // oneshot: full year (e.g. 2026)
+    uint8_t  target;       // sched_target_t
+    uint8_t  macro_idx;    // when target == SCHED_TARGET_MACRO
 } sched_event_t;
+
+// --- Macro model -----------------------------------------------------------
+// A macro is a named, ordered list of steps. Each step waits delay_s seconds
+// (relative to the previous step) and then applies `action` to its relay_mask.
+// Macros manipulate relay override modes only - the controller remains the sole
+// writer of the physical outputs. Step timing is monotonic, so macros run even
+// when the wall clock is not yet valid.
+typedef struct {
+    uint16_t delay_s;      // seconds to wait before this step (>= 0)
+    uint8_t  relay_mask;   // bit0..bit5 -> relay 1..6 this step acts on
+    uint8_t  action;       // relay_mode_t applied to the masked relays
+} macro_step_t;
+
+typedef struct {
+    bool         used;
+    char         name[MACRO_NAME_MAX];
+    uint8_t      step_count;
+    macro_step_t steps[MAX_MACRO_STEPS];
+} macro_t;
+
+// How an active macro advances between steps.
+typedef enum {
+    MACRO_RUN_AUTO   = 0,  // advance automatically as each step's delay elapses
+    MACRO_RUN_MANUAL = 1,  // hold at each step until an explicit "step" command
+} macro_run_t;
 
 // --- Time source -----------------------------------------------------------
 typedef enum {
@@ -92,6 +130,8 @@ typedef struct {
     uint8_t  relay_mode[RELAY_COUNT];  // relay_mode_t per relay
     uint16_t event_count;
     sched_event_t events[MAX_SCHEDULE_EVENTS];
+    uint8_t  macro_count;
+    macro_t  macros[MAX_MACROS];
 } app_config_t;
 
 // --- Volatile runtime state -----------------------------------------------
@@ -104,6 +144,13 @@ typedef struct {
     char           ap_ssid[WIFI_SSID_MAX];
     uint8_t        relay_physical[RELAY_COUNT];  // 1 = energized
     uint8_t        relay_report[RELAY_COUNT];    // relay_report_t
+    // Active-macro status (for UI / REST / Companion feedback).
+    bool           macro_active;
+    int8_t         macro_index;                  // -1 when none active
+    uint8_t        macro_run;                    // macro_run_t
+    uint8_t        macro_step;                   // steps completed so far
+    uint8_t        macro_steps_total;            // steps in the active macro
+    char           macro_name[MACRO_NAME_MAX];
 } app_runtime_t;
 
 // Initialise the mutex and load persisted config (call once, early).

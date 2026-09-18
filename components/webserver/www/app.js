@@ -104,6 +104,7 @@ async function refreshStatus() {
   if (!$("#ssid").matches(":focus") && s.wifi_ssid && !$("#ssid").value)
     $("#ssid").value = s.wifi_ssid;
   if ($("#tzSelect").dataset.current !== s.tz_name) selectTz(s.tz_name);
+  renderMacroStatus(s.macro);
 }
 
 /* ---------------- Timezone ---------------- */
@@ -158,6 +159,7 @@ $("#saveWifi").addEventListener("click", async () => {
 
 /* ---------------- Schedule ---------------- */
 let events = [];
+let macros = [];   // [{index, name, steps:[{delay, action, relays:[]}]}]
 
 function hms(e) {
   const p = n => String(n).padStart(2, "0");
@@ -166,30 +168,55 @@ function hms(e) {
 function eventCard(e, idx) {
   const div = document.createElement("div");
   div.className = "event";
+  const isMacro = e.target === "macro";
   const relayChips = [1,2,3,4,5,6].map(r =>
     `<span class="chip ${e.relays.includes(r) ? "sel" : ""}" data-relay="${r}">${r}</span>`).join("");
   const dowChips = DOW.map((d, i) =>
     `<span class="chip ${e.dow.includes(i) ? "sel" : ""}" data-dow="${i}">${d}</span>`).join("");
+  const macroOpts = macros.length
+    ? macros.map(m => `<option value="${m.index}" ${e.macro === m.index ? "selected" : ""}>${m.name || ("Macro " + m.index)}</option>`).join("")
+    : `<option value="">(no macros defined)</option>`;
+
+  const targetBlock = `
+    <div class="grp"><span>Do</span>
+      <select class="actsel" data-target>
+        <option value="relays" ${!isMacro ? "selected" : ""}>Set relays</option>
+        <option value="macro" ${isMacro ? "selected" : ""}>Start macro</option>
+      </select></div>`;
+  const relayActionBlock = `
+    <div class="grp"><span>Relays</span><div class="chips" data-relays>${relayChips}</div></div>
+    <div class="grp"><span>Action</span>
+      <select class="actsel" data-act>
+        <option value="on" ${e.action === "on" ? "selected" : ""}>Enable (NO)</option>
+        <option value="off" ${e.action === "off" ? "selected" : ""}>Disable (NC)</option>
+      </select></div>`;
+  const macroBlock = `
+    <div class="grp"><span>Macro</span>
+      <select class="actsel" data-macro>${macroOpts}</select></div>`;
+
   div.innerHTML = `
     <div class="erow">
       <label class="switch"><input type="checkbox" ${e.enabled ? "checked" : ""} data-en>
         <span class="track"></span></label>
-      <div class="grp"><span>Relays</span><div class="chips" data-relays>${relayChips}</div></div>
+      ${targetBlock}
+      ${isMacro ? macroBlock : relayActionBlock}
       <div class="grp"><span>Days</span><div class="chips" data-dows>${dowChips}</div></div>
       <div class="grp"><span>Time</span><input class="timeinput" type="time" step="1" value="${hms(e)}" data-time></div>
-      <div class="grp"><span>Action</span>
-        <select class="actsel" data-act>
-          <option value="on" ${e.action === "on" ? "selected" : ""}>Enable (NO)</option>
-          <option value="off" ${e.action === "off" ? "selected" : ""}>Disable (NC)</option>
-        </select></div>
       <button class="del" data-del>Delete</button>
     </div>`;
 
   $("[data-en]", div).addEventListener("change", ev => e.enabled = ev.target.checked);
-  $$("[data-relays] .chip", div).forEach(c => c.addEventListener("click", () => {
-    const r = +c.dataset.relay; c.classList.toggle("sel");
-    e.relays = c.classList.contains("sel") ? [...e.relays, r] : e.relays.filter(x => x !== r);
-  }));
+  $("[data-target]", div).addEventListener("change", ev => { e.target = ev.target.value; renderEvents(); });
+  if (isMacro) {
+    const ms = $("[data-macro]", div);
+    if (ms && macros.length) { e.macro = +ms.value; ms.addEventListener("change", ev => e.macro = +ev.target.value); }
+  } else {
+    $$("[data-relays] .chip", div).forEach(c => c.addEventListener("click", () => {
+      const r = +c.dataset.relay; c.classList.toggle("sel");
+      e.relays = c.classList.contains("sel") ? [...e.relays, r] : e.relays.filter(x => x !== r);
+    }));
+    $("[data-act]", div).addEventListener("change", ev => e.action = ev.target.value);
+  }
   $$("[data-dows] .chip", div).forEach(c => c.addEventListener("click", () => {
     const d = +c.dataset.dow; c.classList.toggle("sel");
     e.dow = c.classList.contains("sel") ? [...e.dow, d] : e.dow.filter(x => x !== d);
@@ -198,7 +225,6 @@ function eventCard(e, idx) {
     const p = (ev.target.value || "00:00:00").split(":").map(Number);
     e.hour = p[0] || 0; e.minute = p[1] || 0; e.second = p[2] || 0;
   });
-  $("[data-act]", div).addEventListener("change", ev => e.action = ev.target.value);
   $("[data-del]", div).addEventListener("click", () => { events.splice(idx, 1); renderEvents(); });
   return div;
 }
@@ -209,8 +235,8 @@ function renderEvents() {
   events.forEach((e, i) => list.appendChild(eventCard(e, i)));
 }
 $("#addEvent").addEventListener("click", () => {
-  events.push({ enabled: true, type: "weekly", action: "on", relays: [], dow: [],
-                hour: 8, minute: 0, second: 0, day: 1, month: 1, year: 2026 });
+  events.push({ enabled: true, type: "weekly", target: "relays", action: "on", macro: macros[0] ? macros[0].index : 0,
+                relays: [], dow: [], hour: 8, minute: 0, second: 0, day: 1, month: 1, year: 2026 });
   renderEvents();
 });
 $("#saveSchedule").addEventListener("click", async () => {
@@ -219,8 +245,119 @@ $("#saveSchedule").addEventListener("click", async () => {
   catch (e) { flash($("#schedMsg"), "Failed: " + e.message, false); }
 });
 async function loadConfig() {
-  try { const c = await api("/api/config"); events = (c.events || []).filter(e => e.type === "weekly"); renderEvents(); }
-  catch (e) { console.error(e); }
+  try {
+    const c = await api("/api/config");
+    macros = (c.macros || []).map(m => ({ index: m.index, name: m.name || "",
+      steps: (m.steps || []).map(s => ({ delay: s.delay || 0, action: s.action || "on", relays: s.relays || [] })) }));
+    events = (c.events || []).filter(e => e.type === "weekly");
+    renderMacros();
+    renderEvents();
+  } catch (e) { console.error(e); }
+}
+
+/* ---------------- Macros ---------------- */
+function macroStepChips(step) {
+  return [1,2,3,4,5,6].map(r =>
+    `<span class="chip ${step.relays.includes(r) ? "sel" : ""}" data-srelay="${r}">${r}</span>`).join("");
+}
+function stepRow(m, step, si) {
+  const row = document.createElement("div");
+  row.className = "mstep";
+  row.innerHTML = `
+    <div class="grp"><span>Wait (s)</span>
+      <input type="number" min="0" class="delayinput" value="${step.delay}" data-delay></div>
+    <div class="grp"><span>Relays</span><div class="chips" data-srelays>${macroStepChips(step)}</div></div>
+    <div class="grp"><span>Action</span>
+      <select class="actsel" data-saction>
+        <option value="on" ${step.action === "on" ? "selected" : ""}>On (NO)</option>
+        <option value="off" ${step.action === "off" ? "selected" : ""}>Off (NC)</option>
+        <option value="auto" ${step.action === "auto" ? "selected" : ""}>Auto</option>
+      </select></div>
+    <button class="del" data-delstep>Delete</button>`;
+  $("[data-delay]", row).addEventListener("change", ev => step.delay = Math.max(0, +ev.target.value || 0));
+  $$("[data-srelays] .chip", row).forEach(c => c.addEventListener("click", () => {
+    const r = +c.dataset.srelay; c.classList.toggle("sel");
+    step.relays = c.classList.contains("sel") ? [...step.relays, r] : step.relays.filter(x => x !== r);
+  }));
+  $("[data-saction]", row).addEventListener("change", ev => step.action = ev.target.value);
+  $("[data-delstep]", row).addEventListener("click", () => { m.steps.splice(si, 1); renderMacros(); });
+  return row;
+}
+function macroCard(m, mi) {
+  const div = document.createElement("div");
+  div.className = "macro";
+  div.innerHTML = `
+    <div class="mhead">
+      <input class="mname" value="${m.name || ""}" placeholder="Macro name" data-name>
+      <div class="mbtns">
+        <button class="btn" data-run>▶ Run</button>
+        <button class="btn" data-step>⏭ Step</button>
+        <button class="btn" data-stop>■ Stop</button>
+        <button class="del" data-delmacro>Delete</button>
+      </div>
+    </div>
+    <div class="steps" data-steps></div>
+    <button class="btn addstep" data-addstep>+ Add step</button>`;
+  $("[data-name]", div).addEventListener("change", ev => m.name = ev.target.value);
+  const steps = $("[data-steps]", div);
+  if (!m.steps.length) steps.innerHTML = `<p class="hint">No steps yet.</p>`;
+  m.steps.forEach((s, si) => steps.appendChild(stepRow(m, s, si)));
+  $("[data-addstep]", div).addEventListener("click", () => { m.steps.push({ delay: 5, action: "on", relays: [] }); renderMacros(); });
+  $("[data-delmacro]", div).addEventListener("click", () => { macros.splice(mi, 1); renderMacros(); renderEvents(); });
+  $("[data-run]", div).addEventListener("click", () => macroControl("start", mi));
+  $("[data-step]", div).addEventListener("click", () => macroControl("step", mi));
+  $("[data-stop]", div).addEventListener("click", () => macroControl("stop", mi));
+  return div;
+}
+function renderMacros() {
+  const list = $("#macroList");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!macros.length) { list.innerHTML = `<p class="hint">No macros yet. Add one to get started.</p>`; return; }
+  macros.forEach((m, i) => list.appendChild(macroCard(m, i)));
+}
+function macrosPayload() {
+  return { macros: macros.map(m => ({ name: m.name,
+    steps: m.steps.map(s => ({ delay: +s.delay || 0, action: s.action, relays: s.relays })) })) };
+}
+async function saveMacros(silent) {
+  await post("/api/macros", macrosPayload());
+  if (!silent) flash($("#macroMsg"), "Macros saved.");
+}
+$("#addMacro").addEventListener("click", () => { macros.push({ index: macros.length, name: "", steps: [] }); renderMacros(); });
+$("#saveMacros").addEventListener("click", async () => {
+  try { await saveMacros(false); await loadConfig(); }
+  catch (e) { flash($("#macroMsg"), "Failed: " + e.message, false); }
+});
+// Save current definitions first (so server slots match the editor), then send
+// the control command referencing the macro by its list position.
+async function macroControl(action, mi) {
+  try {
+    if (action !== "stop") await saveMacros(true);
+    const body = action === "stop" ? { action } : { action, macro: mi };
+    await post("/api/macro", body);
+    refreshStatus();
+  } catch (e) { flash($("#macroMsg"), "Failed: " + e.message, false); }
+}
+function renderMacroStatus(mac) {
+  const el = $("#macroActive");
+  if (el) {
+    if (mac && mac.active) {
+      el.innerHTML = `<span class="dot on"></span> Running <b>${mac.name || ("Macro " + mac.index)}</b>
+        — step ${mac.step}/${mac.steps} (${mac.run})
+        <button class="btn" id="macStopInline">■ Stop</button>`;
+      const b = $("#macStopInline"); if (b) b.onclick = () => macroControl("stop");
+    } else {
+      el.innerHTML = `<span class="dot"></span> No macro running.`;
+    }
+    el.hidden = false;
+  }
+  // Header pill, visible from any tab while a macro runs.
+  let mp = $("#pill-macro");
+  if (mac && mac.active) {
+    if (!mp) { mp = document.createElement("span"); mp.id = "pill-macro"; $("#pills").appendChild(mp); }
+    mp.className = "pill ok"; mp.textContent = "▶ " + (mac.name || "Macro");
+  } else if (mp) { mp.remove(); }
 }
 
 /* ---------------- Boot ---------------- */

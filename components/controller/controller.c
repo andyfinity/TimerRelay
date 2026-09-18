@@ -5,6 +5,7 @@
 #include "relays.h"
 #include "schedule.h"
 #include "timekeeper.h"
+#include "macros.h"
 
 #include <time.h>
 #include "freertos/FreeRTOS.h"
@@ -14,17 +15,43 @@
 static const char *TAG = "controller";
 static TaskHandle_t s_task;
 
+// Wall-clock watermark for edge-triggering macro-start schedule events.
+static time_t s_macro_since;
+static bool   s_macro_since_init;
+
 static void evaluate_and_apply(void)
 {
     time_t now = time(NULL);
     bool time_valid = timekeeper_time_valid();
 
+    // 1. Fire any macro-start schedule events crossing their time this tick.
+    //    Re-sync the watermark (without firing) on first run or a clock jump so
+    //    a backlog of past events doesn't all fire at boot / after NTP sync.
+    if (time_valid) {
+        if (!s_macro_since_init || now < s_macro_since || (now - s_macro_since) > 3) {
+            s_macro_since = now;
+            s_macro_since_init = true;
+        } else {
+            uint8_t starts[MAX_SCHEDULE_EVENTS];
+            int nc = schedule_collect_macro_starts(now, s_macro_since, starts,
+                                                   sizeof(starts));
+            for (int i = 0; i < nc; i++) {
+                macros_start(starts[i], MACRO_RUN_AUTO);
+            }
+            s_macro_since = now;
+        }
+    }
+
+    // 2. Advance the active macro (monotonic timing; runs even without a clock).
+    macros_tick();
+
+    // 3. Relay levels from the schedule. When time is invalid, auto_on stays
+    //    all-false: AUTO relays hold the safe disabled state until the clock is
+    //    known. Manual overrides (incl. macro-set ones) still apply.
     bool auto_on[RELAY_COUNT] = {0};
     if (time_valid) {
         schedule_eval(now, auto_on);
     }
-    // When time is invalid, auto_on stays all-false: AUTO relays hold the safe
-    // disabled state until the clock is known. Manual overrides still apply.
 
     uint8_t phys[RELAY_COUNT];
     appstate_lock();

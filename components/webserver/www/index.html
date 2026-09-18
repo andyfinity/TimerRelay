@@ -28,6 +28,7 @@
   <nav class="tabs" id="tabs">
     <button class="tab active" data-tab="relays">Relays</button>
     <button class="tab" data-tab="schedule">Schedule</button>
+    <button class="tab" data-tab="macros">Macros</button>
     <button class="tab" data-tab="time">Time &amp; Zone</button>
     <button class="tab" data-tab="wifi">Wi-Fi</button>
   </nav>
@@ -50,6 +51,21 @@
       <p class="hint">Each event enables (NO) or disables (NC) the selected relays at a time on the chosen days. The most recent past event wins; simultaneous events apply together.</p>
       <div id="eventList" class="event-list"></div>
       <div id="schedMsg" class="msg"></div>
+    </section>
+
+    <!-- MACROS -->
+    <section class="panel" id="tab-macros">
+      <div class="row-between">
+        <h2>Macros</h2>
+        <div>
+          <button class="btn" id="addMacro">+ Add macro</button>
+          <button class="btn primary" id="saveMacros">Save macros</button>
+        </div>
+      </div>
+      <p class="hint">A macro runs a timed series of relay actions. Each step waits its delay (seconds) after the previous step, then applies its action to the selected relays. Steps set relay overrides — use an <b>Auto</b> action to hand a relay back to the schedule. Save before running.</p>
+      <div id="macroActive" class="macro-active" hidden></div>
+      <div id="macroList" class="macro-list"></div>
+      <div id="macroMsg" class="msg"></div>
     </section>
 
     <!-- TIME -->

@@ -14,6 +14,11 @@ companion-module/pkg/
 companion-module/*.tgz
 companion-module/package-lock.json
 
+# --- KiCad local/backup artifacts (under Docs/) ---
+*-backups/
+_autosave-*
+*.lck
+
 # --- Editor / OS ---
 *.swp
 *~

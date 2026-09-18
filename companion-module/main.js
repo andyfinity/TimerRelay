@@ -11,6 +11,9 @@ const RELAY_COUNT = 6
 class TimerRelayInstance extends InstanceBase {
 	async init(config) {
 		this.config = config
+		this.macros = [] // [{id, label}] macro choices, refreshed from /api/config
+		this.macroSig = ''
+		this.pollCount = 0
 		// Cached device state, refreshed by polling.
 		this.state = {
 			relays: [], // [{id, mode, report, physical}]
@@ -21,14 +24,17 @@ class TimerRelayInstance extends InstanceBase {
 			ip: '',
 			local: '',
 			tz_name: '',
+			macro_active: false,
+			macro_index: -1,
+			macro_name: '',
+			macro_step: 0,
+			macro_steps: 0,
+			macro_run: 'auto',
 		}
 
 		this.updateStatus(InstanceStatus.Connecting)
-		this.setActionDefinitions(getActions(this))
-		this.setFeedbackDefinitions(getFeedbacks(this))
-		this.setVariableDefinitions(getVariableDefinitions(RELAY_COUNT))
-		this.setPresetDefinitions(getPresets(RELAY_COUNT))
-
+		await this.fetchConfig() // populate macro choices before defining actions
+		this.updateDefinitions()
 		this.startPolling()
 	}
 
@@ -38,7 +44,41 @@ class TimerRelayInstance extends InstanceBase {
 
 	async configUpdated(config) {
 		this.config = config
+		await this.fetchConfig()
+		this.updateDefinitions()
 		this.startPolling()
+	}
+
+	updateDefinitions() {
+		this.setActionDefinitions(getActions(this))
+		this.setFeedbackDefinitions(getFeedbacks(this))
+		this.setVariableDefinitions(getVariableDefinitions(RELAY_COUNT))
+		this.setPresetDefinitions(getPresets(RELAY_COUNT, this.macros))
+	}
+
+	// Refresh the macro list; rebuild definitions only when it actually changes.
+	async fetchConfig() {
+		const base = this.baseUrl()
+		if (!base) return
+		try {
+			const res = await fetch(base + '/api/config', { signal: AbortSignal.timeout(4000) })
+			if (!res.ok) throw new Error(`HTTP ${res.status}`)
+			const c = await res.json()
+			const list = (c.macros || []).map((m) => ({ id: m.index, label: m.name || `Macro ${m.index}` }))
+			const sig = JSON.stringify(list)
+			if (sig !== this.macroSig) {
+				this.macros = list
+				this.macroSig = sig
+				this.updateDefinitions()
+			}
+		} catch (e) {
+			// Non-fatal; /api/status polling reports connection health.
+		}
+	}
+
+	async macroControl(action, macroId) {
+		const body = action === 'stop' ? { action } : { action, macro: Number(macroId) }
+		return this.apiPost('/api/macro', body)
 	}
 
 	getConfigFields() {
@@ -138,9 +178,21 @@ class TimerRelayInstance extends InstanceBase {
 			this.state.local = s.local || ''
 			this.state.tz_name = s.tz_name || ''
 
+			const m = s.macro || {}
+			this.state.macro_active = !!m.active
+			this.state.macro_index = m.index != null ? m.index : -1
+			this.state.macro_name = m.name || ''
+			this.state.macro_step = m.step || 0
+			this.state.macro_steps = m.steps || 0
+			this.state.macro_run = m.run || 'auto'
+
 			this.updateStatus(InstanceStatus.Ok)
 			this.publishVariables()
-			this.checkFeedbacks('relay_state', 'relay_energized', 'time_valid', 'ntp_reachable')
+			this.checkFeedbacks('relay_state', 'relay_energized', 'relay_manual', 'time_valid',
+				'ntp_reachable', 'macro_active', 'macro_running')
+
+			// Periodically resync macro choices in case they were edited elsewhere.
+			if (this.pollCount++ % 15 === 0) this.fetchConfig()
 		} catch (e) {
 			this.updateStatus(InstanceStatus.ConnectionFailure, e.message)
 		}
@@ -165,6 +217,10 @@ class TimerRelayInstance extends InstanceBase {
 		vals['ip'] = this.state.ip
 		vals['local_time'] = this.state.local
 		vals['timezone'] = this.state.tz_name
+		vals['macro_active'] = this.state.macro_active ? 'yes' : 'no'
+		vals['macro_name'] = this.state.macro_active ? this.state.macro_name : '-'
+		vals['macro_step'] = this.state.macro_steps ? `${this.state.macro_step}/${this.state.macro_steps}` : '-'
+		vals['macro_run'] = this.state.macro_active ? this.state.macro_run : '-'
 		this.setVariableValues(vals)
 	}
 }
