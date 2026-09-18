@@ -39,6 +39,7 @@ Per relay: `relay1_mode`, `relay1_report`, `relay1_energized`, … through relay
 Time / NTP: `time_valid`, `time_source`, `ntp_reachable`, `ntp_reliable`, `ntp_last_sync` (e.g. `4m ago`), `local_time`, `timezone`.
 Next scheduled event: `next_event_in` (H:MM:SS countdown, ticks every second), `next_event_secs`, `next_event_at` (local time), `next_event_desc` (e.g. `R1,R2 on` or `Macro: Blink`).
 Network: `net_state`, `ip`.
+Firmware: `firmware_version`, `firmware_slot` (the running OTA partition).
 Macros: `macro_active`, `macro_name`, `macro_index`, `macro_step` (e.g. `2/3`), `macro_step_num`, `macro_steps_total`, `macro_run` (auto/manual).
 
 ## Presets

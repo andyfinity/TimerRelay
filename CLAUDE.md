@@ -61,6 +61,17 @@ A step is either a relay action (`call_macro < 0`) or a call to another macro
 The engine runs a small frame stack (`MACRO_CALL_DEPTH`) so calls nest; per-tick
 and per-resolve guards cap runaway zero-delay loops and recursion.
 
+## OTA
+Push-style updates in `components/ota/` (esp_ota_ops). `POST /api/ota` streams the
+raw `.bin` body straight into the inactive slot (`ota_begin`/`ota_write`/
+`ota_finish`), sets the boot partition, then `ota_reboot_soon()`. Never buffer the
+whole image. Rollback is enabled (`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`), so
+`app_main` calls `ota_mark_valid()` once startup succeeds — keep that call, or a
+good image will roll back. Partition table (`partitions.csv`) is dual-slot
+(ota_0/ota_1 + otadata); NVS keeps its offset so settings survive updates. First
+flash is serial; later updates are OTA. Web UI: the System tab uploads via XHR
+with progress.
+
 ## Web UI
 Embedded from `components/webserver/www/` via `EMBED_FILES` (symbols like
 `_binary_index_html_start`). Vanilla HTML/CSS/JS, no build step. It polls

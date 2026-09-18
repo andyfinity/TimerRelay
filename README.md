@@ -22,6 +22,10 @@ Companion module. Built with **ESP-IDF v6.0.2**.
 - **Networking**: joins your Wi-Fi as a station; if none is configured or the join
   times out, it hosts its own open **`TimerRelay-XXXX`** network with a captive
   portal for setup.
+- **OTA updates**: upload a new firmware `.bin` from the web UI (System tab) or
+  `POST /api/ota`; the device writes it to the spare app slot, verifies it, and
+  reboots into it, with **automatic rollback** if the new image fails to start.
+  Settings and Wi-Fi survive updates.
 - **Persistence**: settings and relay override modes survive power cycles, stored
   in NVS with write-on-change and a deliberately oversized partition so wear
   leveling spreads erase cycles — suited to a long service life.
@@ -56,6 +60,10 @@ idf.py -p /dev/ttyACM0 flash monitor
 In VS Code, the ESP-IDF extension tasks are pre-configured in `.vscode/`
 (Build / Flash+Monitor / Menuconfig / Fullclean).
 
+The **first** flash must be over USB serial (it writes the bootloader and the
+OTA partition layout). After that, subsequent updates can be done **over the
+air** — from the web UI's System tab or `POST /api/ota` — with no cable.
+
 ## REST API (unauthenticated, trusted-LAN)
 
 Plain HTTP on **port 80**, JSON in and out, no authentication (by design — this is
@@ -77,6 +85,7 @@ Quick reference:
 | POST | `/api/time`     | `{"epoch":<utc>}` | Manual time set |
 | POST | `/api/timezone` | `{"name":"America/New_York"}` | Set timezone |
 | POST | `/api/wifi`     | `{"ssid":"…","pass":"…"}` | Set Wi-Fi + reconnect |
+| POST | `/api/ota`      | raw `.bin` body | Install firmware, then reboot |
 
 All POST bodies use `Content-Type: application/json` and return `{"ok":true}` on
 success or HTTP **400** with a short reason on bad input. Every successful write is
@@ -220,6 +229,21 @@ different IP and the connection you made the request on will drop.
 curl -X POST http://timerrelay.local/api/wifi -H 'Content-Type: application/json' -d '{"ssid":"Studio","pass":"hunter2"}'
 ```
 
+### POST `/api/ota` — install firmware
+
+Send a compiled `build/timer_relay.bin` as the **raw request body** (not multipart).
+The bytes stream directly into the inactive OTA slot; on success the device
+switches the boot slot and reboots (`{"ok":true,"rebooting":true}`), dropping the
+connection as it restarts. `/api/status` reports the running `fw_version` and
+`fw_partition`. If the new image fails to boot/confirm healthy, the bootloader
+rolls back to the previous slot.
+
+```bash
+curl -X POST --data-binary @build/timer_relay.bin http://timerrelay.local/api/ota
+```
+
+The web UI's **System** tab does the same with a file picker and a progress bar.
+
 ### Static & captive-portal routes
 
 `GET /`, `/index.html`, `/style.css`, `/app.js` serve the UI. Common OS
@@ -249,6 +273,7 @@ components/
   netmgr/     Wi-Fi STA, AP fallback, captive-portal DNS
   controller/ 1 Hz loop: schedule + overrides -> relays
   webserver/  embedded dark-theme site (www/) + REST API
+  ota/        streaming push firmware updates (dual-slot + rollback)
   cjson/      vendored cJSON (MIT)
 companion-module/         Bitfocus Companion v3 module
 partitions.csv            oversized NVS for wear leveling

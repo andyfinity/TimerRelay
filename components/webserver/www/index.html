@@ -31,6 +31,7 @@
     <button class="tab" data-tab="macros">Macros</button>
     <button class="tab" data-tab="time">Time &amp; Zone</button>
     <button class="tab" data-tab="wifi">Wi-Fi</button>
+    <button class="tab" data-tab="system">System</button>
   </nav>
 
   <main>
@@ -113,6 +114,26 @@
         <p class="hint">The device restarts its Wi-Fi to join. If it can't, it re-hosts its own <b id="apName">setup</b> network.</p>
       </div>
       <div id="wifiMsg" class="msg"></div>
+    </section>
+
+    <!-- SYSTEM -->
+    <section class="panel" id="tab-system">
+      <h2>System</h2>
+      <div class="card">
+        <div class="kv"><span>Firmware version</span><b id="fwVersion">—</b></div>
+        <div class="kv"><span>Running slot</span><b id="fwPartition">—</b></div>
+        <div class="kv"><span>Device time</span><b id="sysTime">—</b></div>
+      </div>
+      <div class="card">
+        <label>Update firmware (OTA)</label>
+        <p class="hint">Upload a compiled <code>timer_relay.bin</code>. The device writes it to the spare slot, verifies it, and reboots into it. If the new image fails to start it rolls back automatically, so a bad upload won't brick the device. Settings and Wi-Fi are preserved.</p>
+        <div class="inline">
+          <input type="file" id="fwFile" accept=".bin">
+          <button class="btn primary" id="fwUpload">Upload &amp; install</button>
+        </div>
+        <div class="progress" id="fwProgWrap" hidden><div class="bar" id="fwProg"></div></div>
+        <div id="otaMsg" class="msg"></div>
+      </div>
     </section>
   </main>
 

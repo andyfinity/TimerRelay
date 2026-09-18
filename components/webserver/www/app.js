@@ -105,6 +105,10 @@ async function refreshStatus() {
     $("#ssid").value = s.wifi_ssid;
   if ($("#tzSelect").dataset.current !== s.tz_name) selectTz(s.tz_name);
   renderMacroStatus(s.macro);
+
+  $("#fwVersion").textContent = s.fw_version || "—";
+  $("#fwPartition").textContent = s.fw_partition || "—";
+  $("#sysTime").textContent = s.time_valid ? s.local : "not set";
 }
 
 /* ---------------- Timezone ---------------- */
@@ -390,6 +394,39 @@ function renderMacroStatus(mac) {
     mp.className = "pill ok"; mp.textContent = "▶ " + (mac.name || "Macro");
   } else if (mp) { mp.remove(); }
 }
+
+/* ---------------- System / OTA ---------------- */
+$("#fwUpload").addEventListener("click", () => {
+  const f = $("#fwFile").files[0];
+  if (!f) { flash($("#otaMsg"), "Choose a .bin file first.", false); return; }
+
+  const wrap = $("#fwProgWrap"), bar = $("#fwProg"), msg = $("#otaMsg");
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/ota");
+  xhr.setRequestHeader("Content-Type", "application/octet-stream");
+  wrap.hidden = false; bar.style.width = "0%";
+  msg.className = "msg"; msg.textContent = "Uploading…";
+  $("#fwUpload").disabled = true;
+
+  xhr.upload.onprogress = (e) => {
+    if (e.lengthComputable) bar.style.width = Math.round((e.loaded / e.total) * 100) + "%";
+  };
+  xhr.onload = () => {
+    if (xhr.status === 200) {
+      bar.style.width = "100%";
+      flash($("#otaMsg"), "Installed — device is rebooting. Reload this page in ~15 s.");
+    } else {
+      $("#fwUpload").disabled = false;
+      flash($("#otaMsg"), "Update failed: " + (xhr.responseText || xhr.status), false);
+    }
+  };
+  xhr.onerror = () => {
+    // The socket often drops as the device reboots right after accepting the image.
+    $("#fwUpload").disabled = false;
+    flash($("#otaMsg"), "Connection closed — if the upload reached 100%, the device is rebooting.", false);
+  };
+  xhr.send(f);
+});
 
 /* ---------------- Boot ---------------- */
 loadTz();

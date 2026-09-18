@@ -185,6 +185,12 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .delayinput { width: 90px; }
 .addstep { width: 100%; }
 
+/* OTA progress */
+.progress { height: 10px; background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin-top: 12px; }
+.progress .bar { height: 100%; width: 0; background: var(--accent); transition: width .2s ease; }
+input[type=file] { padding: 8px; }
+code { background: var(--bg2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; font-size: 13px; }
+
 .msg { min-height: 20px; font-size: 13px; margin-top: 10px; }
 .msg.ok { color: var(--green); }
 .msg.err { color: var(--red); }

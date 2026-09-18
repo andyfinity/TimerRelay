@@ -7,6 +7,7 @@
 #include "controller.h"
 #include "macros.h"
 #include "schedule.h"
+#include "ota.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -132,6 +133,8 @@ static esp_err_t serve_asset(httpd_req_t *req, const char *start, const char *en
                              const char *ctype)
 {
     httpd_resp_set_type(req, ctype);
+    // Revalidate each load so a firmware/UI update isn't masked by a stale cache.
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
     return httpd_resp_send(req, start, end - start);
 }
 
@@ -230,6 +233,9 @@ static esp_err_t h_status(httpd_req_t *req)
     timekeeper_ntp_status(&nreach, &nrel, &nage);
     cJSON_AddBoolToObject(root, "ntp_reliable", nrel);
     cJSON_AddNumberToObject(root, "ntp_last_sync_age", nage);
+
+    cJSON_AddStringToObject(root, "fw_version", ota_running_version());
+    cJSON_AddStringToObject(root, "fw_partition", ota_running_partition());
     appstate_unlock();
 
     return send_json(req, root);
@@ -635,6 +641,53 @@ static esp_err_t h_set_wifi(httpd_req_t *req)
 }
 
 // ---------------------------------------------------------------------------
+// POST /api/ota   raw firmware .bin body, streamed into the inactive OTA slot
+// ---------------------------------------------------------------------------
+static esp_err_t h_ota(httpd_req_t *req)
+{
+    if (ota_begin() != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "ota unavailable");
+        return ESP_FAIL;
+    }
+
+    const size_t CHUNK = 4096;
+    char *buf = malloc(CHUNK);
+    if (!buf) {
+        ota_abort();
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "mem");
+        return ESP_FAIL;
+    }
+
+    int remaining = req->content_len;
+    esp_err_t err = ESP_OK;
+    while (remaining > 0) {
+        int want = remaining < (int)CHUNK ? remaining : (int)CHUNK;
+        int r = httpd_req_recv(req, buf, want);
+        if (r == HTTPD_SOCK_ERR_TIMEOUT) continue;
+        if (r <= 0) { err = ESP_FAIL; break; }
+        err = ota_write(buf, r);
+        if (err != ESP_OK) break;
+        remaining -= r;
+    }
+    free(buf);
+
+    if (err != ESP_OK || remaining > 0) {
+        ota_abort();
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "upload failed");
+        return ESP_FAIL;
+    }
+    if (ota_finish() != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "image invalid");
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"ok\":true,\"rebooting\":true}");
+    ota_reboot_soon(1200);   // let the response flush, then reboot into the new slot
+    return ESP_OK;
+}
+
+// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 static void reg(httpd_handle_t s, const char *uri, httpd_method_t m,
@@ -651,6 +704,8 @@ void webserver_start(void)
     cfg.uri_match_fn = httpd_uri_match_wildcard;
     cfg.stack_size = 8192;
     cfg.lru_purge_enable = true;
+    cfg.recv_wait_timeout = 20;   // headroom for streaming a firmware upload
+    cfg.send_wait_timeout = 20;
 
     if (httpd_start(&s_httpd, &cfg) != ESP_OK) {
         ESP_LOGE(TAG, "httpd start failed");
@@ -672,6 +727,7 @@ void webserver_start(void)
     reg(s_httpd, "/api/time", HTTP_POST, h_set_time);
     reg(s_httpd, "/api/timezone", HTTP_POST, h_set_tz);
     reg(s_httpd, "/api/wifi", HTTP_POST, h_set_wifi);
+    reg(s_httpd, "/api/ota", HTTP_POST, h_ota);
 
     // Common OS captive-portal probes -> redirect into the config UI.
     reg(s_httpd, "/generate_204", HTTP_GET, h_captive);

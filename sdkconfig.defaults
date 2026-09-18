@@ -35,3 +35,8 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144
 
 # Bump default event loop / system event task a touch for Wi-Fi + captive DNS
 CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096
+
+# OTA: roll back to the previous slot if a freshly flashed image doesn't confirm
+# healthy on boot. app_main calls esp_ota_mark_app_valid_cancel_rollback() once
+# startup succeeds (see ota_mark_valid()).
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y

@@ -1,10 +1,13 @@
-# TimerRelay partition table (4 MB flash, XIAO ESP32C6)
+# TimerRelay partition table (4 MB flash, XIAO ESP32C6) - OTA layout.
 #
-# A large, dedicated NVS partition gives the key-value store plenty of headroom
-# so its built-in wear leveling can spread erase cycles across many sectors -
-# important for the long service life of this always-on controller.
+# Two app slots (ota_0 / ota_1) plus an otadata partition let the device update
+# itself over the air into the inactive slot and switch on reboot, with rollback
+# if the new image fails to confirm healthy. NVS keeps its original offset/size
+# so settings, Wi-Fi and relay modes survive a firmware update.
 #
-# Name,     Type, SubType,  Offset,   Size
-nvs,        data, nvs,      0x9000,   0x10000
-phy_init,   data, phy,      0x19000,  0x1000
-factory,    app,  factory,  0x20000,  0x1D0000
+# Name,     Type, SubType,  Offset,    Size
+nvs,        data, nvs,      0x9000,    0x10000
+otadata,    data, ota,      0x19000,   0x2000
+phy_init,   data, phy,      0x1b000,   0x1000
+ota_0,      app,  ota_0,    0x20000,   0x1F0000
+ota_1,      app,  ota_1,    0x210000,  0x1F0000

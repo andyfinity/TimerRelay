@@ -14,6 +14,8 @@ function getVariableDefinitions(relayCount) {
 	defs.push({ variableId: 'ntp_last_sync', name: 'Time since last NTP sync' })
 	defs.push({ variableId: 'net_state', name: 'Network state' })
 	defs.push({ variableId: 'ip', name: 'IP address' })
+	defs.push({ variableId: 'firmware_version', name: 'Firmware version' })
+	defs.push({ variableId: 'firmware_slot', name: 'Running OTA slot' })
 	defs.push({ variableId: 'local_time', name: 'Device local time' })
 	defs.push({ variableId: 'timezone', name: 'Timezone name' })
 	defs.push({ variableId: 'next_event_in', name: 'Time to next scheduled event (H:MM:SS)' })

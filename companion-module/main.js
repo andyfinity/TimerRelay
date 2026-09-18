@@ -51,6 +51,8 @@ class TimerRelayInstance extends InstanceBase {
 			next_event_desc: '',
 			ntp_reliable: false,
 			ntp_last_sync_age: -1,
+			fw_version: '',
+			fw_partition: '',
 		}
 
 		this.updateStatus(InstanceStatus.Connecting)
@@ -218,6 +220,8 @@ class TimerRelayInstance extends InstanceBase {
 
 			this.state.ntp_reliable = !!s.ntp_reliable
 			this.state.ntp_last_sync_age = s.ntp_last_sync_age != null ? s.ntp_last_sync_age : -1
+			this.state.fw_version = s.fw_version || ''
+			this.state.fw_partition = s.fw_partition || ''
 
 			this.updateStatus(InstanceStatus.Ok)
 			this.publishVariables()
@@ -262,6 +266,8 @@ class TimerRelayInstance extends InstanceBase {
 		vals['next_event_desc'] = this.state.next_event_valid ? this.state.next_event_desc : '-'
 		vals['ntp_reliable'] = this.state.ntp_reliable ? 'yes' : 'no'
 		vals['ntp_last_sync'] = fmtAge(this.state.ntp_last_sync_age)
+		vals['firmware_version'] = this.state.fw_version || '?'
+		vals['firmware_slot'] = this.state.fw_partition || '?'
 		this.setVariableValues(vals)
 	}
 
