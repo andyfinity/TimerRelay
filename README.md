@@ -1,4 +1,4 @@
-# TimerRelayV2
+# TimerRelay
 
 Timer-driven controller for the **Seeed Studio XIAO ESP32C6 + 6-channel Wi-Fi 5V relay** board.
 Switches relays on a weekly schedule (in local time, DST-aware), with manual

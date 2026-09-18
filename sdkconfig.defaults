@@ -1,4 +1,4 @@
-# TimerRelayV2 default sdkconfig - applied on a clean build.
+# TimerRelay default sdkconfig - applied on a clean build.
 # Target
 CONFIG_IDF_TARGET="esp32c6"
 

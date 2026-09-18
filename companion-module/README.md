@@ -1,6 +1,6 @@
 # russellworks-timerrelay (Bitfocus Companion module)
 
-Companion module for the TimerRelayV2 6-channel Wi-Fi relay controller.
+Companion module for the TimerRelay 6-channel Wi-Fi relay controller.
 
 ## Develop / package
 

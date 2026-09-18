@@ -1,4 +1,4 @@
-# CLAUDE.md — TimerRelayV2
+# CLAUDE.md — TimerRelay
 
 Guidance for working in this repo.
 

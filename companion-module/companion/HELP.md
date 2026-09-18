@@ -1,6 +1,6 @@
-# TimerRelayV2
+# TimerRelay
 
-Control and monitor a **TimerRelayV2** 6-channel Wi-Fi relay controller (Seeed XIAO ESP32C6) from Bitfocus Companion.
+Control and monitor a **TimerRelay** 6-channel Wi-Fi relay controller (Seeed XIAO ESP32C6) from Bitfocus Companion.
 
 ## Configuration
 

@@ -111,7 +111,7 @@ class TimerRelayInstance extends InstanceBase {
 				id: 'info',
 				width: 12,
 				label: 'About',
-				value: 'Connects to a TimerRelayV2 controller over its LAN REST API (no authentication).',
+				value: 'Connects to a TimerRelay controller over its LAN REST API (no authentication).',
 			},
 			{
 				type: 'textinput',

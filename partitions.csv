@@ -1,4 +1,4 @@
-# TimerRelayV2 partition table (4 MB flash, XIAO ESP32C6)
+# TimerRelay partition table (4 MB flash, XIAO ESP32C6)
 #
 # A large, dedicated NVS partition gives the key-value store plenty of headroom
 # so its built-in wear leveling can spread erase cycles across many sectors -

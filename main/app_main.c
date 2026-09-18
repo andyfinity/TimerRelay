@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Andy Russell
 // SPDX-License-Identifier: Apache-2.0
-// TimerRelayV2 - Seeed XIAO ESP32C6 + 6-channel relay timer/controller.
+// TimerRelay - Seeed XIAO ESP32C6 + 6-channel relay timer/controller.
 //
 // Boot order is chosen so the relays reach their safe (disabled) state as early
 // as possible, then persisted config loads, then the control loop, network, and
@@ -19,7 +19,7 @@ static const char *TAG = "app";
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "TimerRelayV2 starting");
+    ESP_LOGI(TAG, "TimerRelay starting");
 
     relays_init();          // drive all outputs low (disabled) immediately
     storage_init();         // NVS

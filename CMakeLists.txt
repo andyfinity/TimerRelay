@@ -1,4 +1,4 @@
-# TimerRelayV2 - top-level project CMake
+# TimerRelay - top-level project CMake
 # ESP-IDF v6.0.2, target esp32c6 (Seeed XIAO ESP32C6 + 6-channel relay board)
 cmake_minimum_required(VERSION 3.16)
 
