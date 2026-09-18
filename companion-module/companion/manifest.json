@@ -14,7 +14,7 @@
   "runtime": {
     "type": "node22",
     "api": "nodejs-ipc",
-    "apiVersion": "1.0.0",
+    "apiVersion": "1.11.3",
     "entrypoint": "../main.js"
   },
   "manufacturer": "Russell.works",

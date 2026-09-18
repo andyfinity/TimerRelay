@@ -13,7 +13,7 @@ Verify downloads against [`SHA256SUMS.txt`](SHA256SUMS.txt):
 | `timer_relay.bin` | The application image. Use this for **OTA updates** (System tab or `POST /api/ota`). Also the app slice for a manual serial flash. |
 | `timer_relay-merged.bin` | All images merged into one file — the easiest **first-time serial flash** (write at `0x0`). |
 | `bootloader.bin`, `partition-table.bin`, `ota_data_initial.bin` | The individual pieces for a manual serial flash at their offsets. |
-| `russellworks-timerrelay-1.3.0.tgz` | The Bitfocus Companion module (source package). |
+| `russellworks-timerrelay-1.3.0.tgz` | The Bitfocus Companion module — a packaged bundle you import directly (built with `companion-module-build`). |
 
 ## Flashing the firmware (first time — USB serial)
 
@@ -51,7 +51,12 @@ preserved across updates.
 
 ## Companion module
 
-Install `russellworks-timerrelay-1.3.0.tgz` into Bitfocus Companion. It is the
-module source; to produce the official packaged build, unpack it and run
-`npm install && npm run build` (needs Node.js). Point the module at the device's
-IP/hostname; the REST API is unauthenticated (trusted-LAN).
+`russellworks-timerrelay-1.3.0.tgz` is a packaged module bundle (dependencies
+bundled), ready to import directly — no Node.js needed. In Bitfocus Companion
+enable **Developer/Beta module** support, then use **Import** and select this
+file (or drop it in your Companion modules directory). Add a connection and set
+the device's IP/hostname; the REST API is unauthenticated (trusted-LAN).
+
+Built against `@companion-module/base` 1.11.x (Companion module API 1.11.3,
+node22 runtime), so it works with any Companion release supporting that
+generation — not tied to a specific Companion version.
