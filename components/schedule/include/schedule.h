@@ -31,6 +31,12 @@ void schedule_eval(time_t now, bool auto_on[RELAY_COUNT]);
 // the caller advances `since` to `now` between calls.
 int schedule_collect_macro_starts(time_t now, time_t since, uint8_t *out, int max);
 
+// Find the soonest enabled event occurring strictly after `now`. On success
+// sets *out_epoch (local epoch of the next firing) and writes a short human
+// description into desc[] (e.g. "R1,R2 on" or "Macro: Blink"). Returns false if
+// no enabled event has any future occurrence.
+bool schedule_next_event(time_t now, time_t *out_epoch, char *desc, size_t desc_len);
+
 #ifdef __cplusplus
 }
 #endif

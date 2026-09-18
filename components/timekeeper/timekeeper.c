@@ -6,14 +6,21 @@
 #include <string.h>
 #include <sys/time.h>
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "esp_netif_sntp.h"
 #include "esp_sntp.h"
 
 static const char *TAG = "timekeeper";
 static bool s_sntp_started = false;
 
+// Monotonic ms of the last successful SNTP sync; -1 = never synced.
+static int64_t s_last_sync_ms = -1;
+
 // A clock reading is "valid" once it is at/after this instant. 2024-01-01 UTC.
 #define VALID_EPOCH_THRESHOLD 1704067200
+// SNTP resyncs hourly; treat NTP as reliable only if the last sync is within
+// ~2 intervals, so a stalled or unreachable server shows as unreliable.
+#define NTP_RELIABLE_MAX_AGE_S 7500
 
 static void mark_valid(time_source_t src)
 {
@@ -30,6 +37,7 @@ static void sntp_sync_cb(struct timeval *tv)
     (void)tv;
     time_t now = time(NULL);
     if (now >= VALID_EPOCH_THRESHOLD) {
+        s_last_sync_ms = esp_timer_get_time() / 1000;
         mark_valid(TIME_SRC_NTP);
         struct tm lt; localtime_r(&now, &lt);
         char buf[32]; strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &lt);
@@ -100,4 +108,19 @@ bool timekeeper_time_valid(void)
     bool v = appstate_runtime()->time_valid;
     appstate_unlock();
     return v;
+}
+
+void timekeeper_ntp_status(bool *reachable, bool *reliable, int32_t *age_s)
+{
+    appstate_lock();
+    bool r = appstate_runtime()->ntp_reachable;
+    appstate_unlock();
+
+    int32_t age = -1;
+    if (r && s_last_sync_ms >= 0) {
+        age = (int32_t)((esp_timer_get_time() / 1000 - s_last_sync_ms) / 1000);
+    }
+    if (reachable) *reachable = r;
+    if (age_s)     *age_s = age;
+    if (reliable)  *reliable = (age >= 0 && age < NTP_RELIABLE_MAX_AGE_S);
 }

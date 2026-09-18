@@ -76,10 +76,18 @@ function getFeedbacks(self) {
 		ntp_reachable: {
 			type: 'boolean',
 			name: 'NTP reachable',
-			description: 'True when NTP has synced successfully.',
+			description: 'True when NTP has synced at least once.',
 			defaultStyle: { bgcolor: combineRgb(0, 100, 160), color: combineRgb(255, 255, 255) },
 			options: [],
 			callback: () => self.state.ntp_reachable,
+		},
+		ntp_reliable: {
+			type: 'boolean',
+			name: 'NTP reliably connected',
+			description: 'True when the last NTP sync is recent enough to trust. Use the inverted style (or a second feedback) to flag a stale/lost time source.',
+			defaultStyle: { bgcolor: combineRgb(0, 130, 90), color: combineRgb(255, 255, 255) },
+			options: [],
+			callback: () => self.state.ntp_reliable,
 		},
 
 		macro_active: {

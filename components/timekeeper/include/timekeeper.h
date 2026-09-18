@@ -30,6 +30,12 @@ void timekeeper_set_manual(time_t utc_epoch);
 // True once the clock is believed correct (NTP synced or manually set).
 bool timekeeper_time_valid(void);
 
+// NTP health for monitoring. `reachable` = a sync has succeeded at least once;
+// `reliable` = the last sync is recent enough to trust (within a couple of sync
+// intervals); `age_s` = seconds since the last successful sync (-1 if never).
+// Any pointer may be NULL.
+void timekeeper_ntp_status(bool *reachable, bool *reliable, int32_t *age_s);
+
 // Curated timezone list for the UI. Enumerate with count/at; look up POSIX by
 // human name. Returns NULL if not found.
 size_t      timekeeper_tz_count(void);

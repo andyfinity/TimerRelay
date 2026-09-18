@@ -108,6 +108,12 @@ setting), `report` (`"auto_on"`/`"auto_off"`/`"manual_on"`/`"manual_off"` — th
 state used for Companion feedback), and `physical` (bool — coil currently
 energized).
 
+Also included: a `macro` object (`active`, `index`, `name`, `step`, `steps`,
+`run`); a `next_event` object (`valid`, `in` = seconds until, `epoch`, `local`,
+`desc` = e.g. `"R1,R2 on"` or `"Macro: Blink"`); and NTP health fields
+`ntp_reliable` (bool — last sync recent enough to trust) and `ntp_last_sync_age`
+(seconds since last sync, `-1` if never).
+
 ```bash
 curl http://timerrelay.local/api/status
 ```

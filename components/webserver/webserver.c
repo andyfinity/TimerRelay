@@ -6,6 +6,7 @@
 #include "netmgr.h"
 #include "controller.h"
 #include "macros.h"
+#include "schedule.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -206,6 +207,29 @@ static esp_err_t h_status(httpd_req_t *req)
     cJSON_AddNumberToObject(mac, "steps", rt->macro_steps_total);
     cJSON_AddStringToObject(mac, "run",
                             rt->macro_run == MACRO_RUN_MANUAL ? "manual" : "auto");
+
+    // Next scheduled event: seconds until, absolute time, and a short label.
+    cJSON *ne = cJSON_AddObjectToObject(root, "next_event");
+    time_t nev;
+    char ndesc[40];
+    if (rt->time_valid && schedule_next_event(now, &nev, ndesc, sizeof(ndesc))) {
+        cJSON_AddBoolToObject(ne, "valid", true);
+        cJSON_AddNumberToObject(ne, "in", (double)(nev - now));
+        cJSON_AddNumberToObject(ne, "epoch", (double)nev);
+        struct tm nlt; localtime_r(&nev, &nlt);
+        char nbuf[32]; strftime(nbuf, sizeof(nbuf), "%Y-%m-%d %H:%M:%S", &nlt);
+        cJSON_AddStringToObject(ne, "local", nbuf);
+        cJSON_AddStringToObject(ne, "desc", ndesc);
+    } else {
+        cJSON_AddBoolToObject(ne, "valid", false);
+    }
+
+    // NTP health: reliable = last sync is recent enough to trust.
+    bool nreach, nrel;
+    int32_t nage;
+    timekeeper_ntp_status(&nreach, &nrel, &nage);
+    cJSON_AddBoolToObject(root, "ntp_reliable", nrel);
+    cJSON_AddNumberToObject(root, "ntp_last_sync_age", nage);
     appstate_unlock();
 
     return send_json(req, root);

@@ -8,6 +8,20 @@ const { getPresets } = require('./presets')
 
 const RELAY_COUNT = 6
 
+// Format a duration in seconds as H:MM:SS (or MM:SS under an hour).
+function fmtDur(s) {
+	s = Math.max(0, Math.round(s))
+	const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
+	const p = (n) => String(n).padStart(2, '0')
+	return h > 0 ? `${h}:${p(m)}:${p(sec)}` : `${p(m)}:${p(sec)}`
+}
+function fmtAge(s) {
+	if (s < 0) return '-'
+	if (s < 60) return `${s}s ago`
+	if (s < 3600) return `${Math.floor(s / 60)}m ago`
+	return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m ago`
+}
+
 class TimerRelayInstance extends InstanceBase {
 	async init(config) {
 		this.config = config
@@ -30,16 +44,25 @@ class TimerRelayInstance extends InstanceBase {
 			macro_step: 0,
 			macro_steps: 0,
 			macro_run: 'auto',
+			next_event_valid: false,
+			next_event_in: 0, // seconds remaining reported by the device
+			next_event_stamp: 0, // Date.now() when next_event_in was read
+			next_event_at: '',
+			next_event_desc: '',
+			ntp_reliable: false,
+			ntp_last_sync_age: -1,
 		}
 
 		this.updateStatus(InstanceStatus.Connecting)
 		await this.fetchConfig() // populate macro choices before defining actions
 		this.updateDefinitions()
 		this.startPolling()
+		this.startCountdown()
 	}
 
 	async destroy() {
 		this.stopPolling()
+		this.stopCountdown()
 	}
 
 	async configUpdated(config) {
@@ -186,10 +209,21 @@ class TimerRelayInstance extends InstanceBase {
 			this.state.macro_steps = m.steps || 0
 			this.state.macro_run = m.run || 'auto'
 
+			const ne = s.next_event || {}
+			this.state.next_event_valid = !!ne.valid
+			this.state.next_event_in = ne.in != null ? ne.in : 0
+			this.state.next_event_stamp = Date.now()
+			this.state.next_event_at = ne.local || ''
+			this.state.next_event_desc = ne.desc || ''
+
+			this.state.ntp_reliable = !!s.ntp_reliable
+			this.state.ntp_last_sync_age = s.ntp_last_sync_age != null ? s.ntp_last_sync_age : -1
+
 			this.updateStatus(InstanceStatus.Ok)
 			this.publishVariables()
+			this.publishCountdown()
 			this.checkFeedbacks('relay_state', 'relay_energized', 'relay_manual', 'time_valid',
-				'ntp_reachable', 'macro_active', 'macro_running')
+				'ntp_reachable', 'ntp_reliable', 'macro_active', 'macro_running')
 
 			// Periodically resync macro choices in case they were edited elsewhere.
 			if (this.pollCount++ % 15 === 0) this.fetchConfig()
@@ -219,9 +253,37 @@ class TimerRelayInstance extends InstanceBase {
 		vals['timezone'] = this.state.tz_name
 		vals['macro_active'] = this.state.macro_active ? 'yes' : 'no'
 		vals['macro_name'] = this.state.macro_active ? this.state.macro_name : '-'
+		vals['macro_index'] = this.state.macro_active ? this.state.macro_index : -1
 		vals['macro_step'] = this.state.macro_steps ? `${this.state.macro_step}/${this.state.macro_steps}` : '-'
+		vals['macro_step_num'] = this.state.macro_active ? this.state.macro_step : 0
+		vals['macro_steps_total'] = this.state.macro_active ? this.state.macro_steps : 0
 		vals['macro_run'] = this.state.macro_active ? this.state.macro_run : '-'
+		vals['next_event_at'] = this.state.next_event_valid ? this.state.next_event_at : '-'
+		vals['next_event_desc'] = this.state.next_event_valid ? this.state.next_event_desc : '-'
+		vals['ntp_reliable'] = this.state.ntp_reliable ? 'yes' : 'no'
+		vals['ntp_last_sync'] = fmtAge(this.state.ntp_last_sync_age)
 		this.setVariableValues(vals)
+	}
+
+	// Local 1 Hz countdown so "time to next event" ticks smoothly between polls.
+	startCountdown() {
+		this.stopCountdown()
+		this.countdownTimer = setInterval(() => this.publishCountdown(), 1000)
+	}
+	stopCountdown() {
+		if (this.countdownTimer) {
+			clearInterval(this.countdownTimer)
+			this.countdownTimer = null
+		}
+	}
+	publishCountdown() {
+		if (!this.state.next_event_valid) {
+			this.setVariableValues({ next_event_in: '-', next_event_secs: -1 })
+			return
+		}
+		const elapsed = (Date.now() - this.state.next_event_stamp) / 1000
+		const remain = Math.max(0, this.state.next_event_in - elapsed)
+		this.setVariableValues({ next_event_in: fmtDur(remain), next_event_secs: Math.round(remain) })
 	}
 }
 

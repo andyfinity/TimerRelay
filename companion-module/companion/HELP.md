@@ -29,14 +29,17 @@ Macro choices are read live from the device and refresh automatically.
 - **Relay is energized** — true when the coil is currently energized.
 - **Relay is under manual override** — true when a relay is forced On or Off.
 - **Clock is valid** / **NTP reachable** — device time status.
+- **NTP reliably connected** — true only while the last NTP sync is recent enough to trust; invert the style to flag a stalled or lost time source.
 - **A macro is running** — true while any macro is active.
 - **Specific macro is running** — true when the selected macro is the active one.
 
 ## Variables
 
 Per relay: `relay1_mode`, `relay1_report`, `relay1_energized`, … through relay 6.
-Global: `time_valid`, `time_source`, `ntp_reachable`, `net_state`, `ip`, `local_time`, `timezone`.
-Macros: `macro_active`, `macro_name`, `macro_step` (e.g. `2/3`), `macro_run` (auto/manual).
+Time / NTP: `time_valid`, `time_source`, `ntp_reachable`, `ntp_reliable`, `ntp_last_sync` (e.g. `4m ago`), `local_time`, `timezone`.
+Next scheduled event: `next_event_in` (H:MM:SS countdown, ticks every second), `next_event_secs`, `next_event_at` (local time), `next_event_desc` (e.g. `R1,R2 on` or `Macro: Blink`).
+Network: `net_state`, `ip`.
+Macros: `macro_active`, `macro_name`, `macro_index`, `macro_step` (e.g. `2/3`), `macro_step_num`, `macro_steps_total`, `macro_run` (auto/manual).
 
 ## Presets
 

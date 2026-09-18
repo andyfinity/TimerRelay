@@ -3,6 +3,7 @@
 #include "schedule.h"
 
 #include <string.h>
+#include <stdio.h>
 
 // Build a local-time epoch from calendar fields, letting mktime resolve DST.
 // Returns (time_t)-1 on an impossible date (e.g. Feb 30). `out_wday` receives
@@ -145,4 +146,103 @@ int schedule_collect_macro_starts(time_t now, time_t since, uint8_t *out, int ma
     }
     appstate_unlock();
     return count;
+}
+
+// Soonest occurrence of one event strictly after `now`, mirroring
+// last_occurrence but searching forward.
+static bool next_occurrence(const sched_event_t *e, time_t now,
+                            const struct tm *lt, time_t *ts)
+{
+    const int h = e->hour, m = e->minute, s = e->second;
+
+    switch (e->type) {
+    case SCHED_WEEKLY:
+        for (int fwd = 0; fwd <= 7; fwd++) {
+            int wday; bool ok;
+            time_t cand = make_local(lt->tm_year + 1900, lt->tm_mon + 1,
+                                     lt->tm_mday + fwd, h, m, s, &wday, &ok);
+            if (cand == (time_t)-1 || !ok) continue;
+            if (!(e->dow_mask & (1u << wday))) continue;
+            if (cand > now) { *ts = cand; return true; }
+        }
+        return false;
+    case SCHED_DAILY:
+        for (int fwd = 0; fwd <= 1; fwd++) {
+            bool ok;
+            time_t cand = make_local(lt->tm_year + 1900, lt->tm_mon + 1,
+                                     lt->tm_mday + fwd, h, m, s, NULL, &ok);
+            if (cand != (time_t)-1 && ok && cand > now) { *ts = cand; return true; }
+        }
+        return false;
+    case SCHED_MONTHLY:
+        for (int fwd = 0; fwd <= 3; fwd++) {
+            bool ok;
+            time_t cand = make_local(lt->tm_year + 1900, lt->tm_mon + 1 + fwd,
+                                     e->day, h, m, s, NULL, &ok);
+            if (cand != (time_t)-1 && ok && cand > now) { *ts = cand; return true; }
+        }
+        return false;
+    case SCHED_YEARLY:
+        for (int fwd = 0; fwd <= 1; fwd++) {
+            bool ok;
+            time_t cand = make_local(lt->tm_year + 1900 + fwd, e->month, e->day,
+                                     h, m, s, NULL, &ok);
+            if (cand != (time_t)-1 && ok && cand > now) { *ts = cand; return true; }
+        }
+        return false;
+    case SCHED_ONESHOT: {
+        bool ok;
+        time_t cand = make_local(e->year, e->month, e->day, h, m, s, NULL, &ok);
+        if (cand != (time_t)-1 && ok && cand > now) { *ts = cand; return true; }
+        return false;
+    }
+    default:
+        return false;
+    }
+}
+
+bool schedule_next_event(time_t now, time_t *out_epoch, char *desc, size_t desc_len)
+{
+    struct tm lt;
+    localtime_r(&now, &lt);
+
+    time_t best = (time_t)-1;
+    int best_i = -1;
+
+    appstate_lock();
+    app_config_t *cfg = appstate_config();
+    uint16_t n = cfg->event_count;
+    if (n > MAX_SCHEDULE_EVENTS) n = MAX_SCHEDULE_EVENTS;
+
+    for (uint16_t i = 0; i < n; i++) {
+        const sched_event_t *e = &cfg->events[i];
+        if (!e->enabled) continue;
+        if (e->target == SCHED_TARGET_RELAYS && e->relay_mask == 0) continue;
+        time_t ts;
+        if (!next_occurrence(e, now, &lt, &ts)) continue;
+        if (best == (time_t)-1 || ts < best) { best = ts; best_i = i; }
+    }
+
+    if (best_i >= 0 && desc && desc_len) {
+        const sched_event_t *e = &cfg->events[best_i];
+        if (e->target == SCHED_TARGET_MACRO) {
+            int mi = e->macro_idx;
+            const char *nm = (mi >= 0 && mi < MAX_MACROS && cfg->macros[mi].used)
+                                 ? cfg->macros[mi].name : "?";
+            snprintf(desc, desc_len, "Macro: %s", nm);
+        } else {
+            char rl[24];
+            int p = 0;
+            rl[0] = '\0';
+            for (int r = 0; r < RELAY_COUNT; r++)
+                if (e->relay_mask & (1u << r))
+                    p += snprintf(rl + p, sizeof(rl) - p, "%sR%d", p ? "," : "", r + 1);
+            snprintf(desc, desc_len, "%s %s", rl, e->action ? "on" : "off");
+        }
+    }
+    appstate_unlock();
+
+    if (best_i < 0) return false;
+    if (out_epoch) *out_epoch = best;
+    return true;
 }
