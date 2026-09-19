@@ -166,7 +166,6 @@ $("#saveWifi").addEventListener("click", async () => {
 /* ---------------- Schedule ---------------- */
 let events = [];
 let macros = [];   // [{index, name, steps:[{delay, action, relays:[]}]}]
-let dragCtx = null;   // { m, from } while a macro step is being dragged
 
 function hms(e) {
   const p = n => String(n).padStart(2, "0");
@@ -316,42 +315,74 @@ function stepRow(m, step, si) {
   }
   $("[data-delstep]", row).addEventListener("click", () => { m.steps.splice(si, 1); renderMacros(); });
 
-  // Drag-and-drop reordering. The row is only draggable while the grip is held,
-  // so the inputs/selects stay normally interactive. Drops are confined to the
-  // same macro's step list.
-  const grip = $("[data-grip]", row);
-  grip.addEventListener("mousedown", () => row.setAttribute("draggable", "true"));
-  grip.addEventListener("mouseup", () => row.removeAttribute("draggable"));
-  row.addEventListener("dragstart", ev => {
-    dragCtx = { m, from: si };
-    row.classList.add("dragging");
-    ev.dataTransfer.effectAllowed = "move";
-    try { ev.dataTransfer.setData("text/plain", String(si)); } catch (e) {}
-  });
-  row.addEventListener("dragend", () => {
-    row.classList.remove("dragging");
-    row.removeAttribute("draggable");
-    row.classList.remove("drop-before", "drop-after");
-    dragCtx = null;
-  });
-  row.addEventListener("dragover", ev => {
-    if (!dragCtx || dragCtx.m !== m) return;   // only within the same macro
-    ev.preventDefault();
-    ev.dataTransfer.dropEffect = "move";
-    const before = (ev.clientY - row.getBoundingClientRect().top) < row.offsetHeight / 2;
-    row.classList.toggle("drop-before", before);
-    row.classList.toggle("drop-after", !before);
-  });
-  row.addEventListener("dragleave", () => row.classList.remove("drop-before", "drop-after"));
-  row.addEventListener("drop", ev => {
-    if (!dragCtx || dragCtx.m !== m) return;
-    ev.preventDefault();
-    const before = row.classList.contains("drop-before");
-    row.classList.remove("drop-before", "drop-after");
-    reorderStep(m, dragCtx.from, si + (before ? 0 : 1));
-  });
+  attachStepDrag(row, m, si);
   return row;
 }
+
+// Pointer-based drag-to-reorder (works for mouse, touch and pen via the Pointer
+// Events API — HTML5 drag events never fire on touch). Dragging only starts
+// from the grip, so inputs/selects stay interactive, and stays confined to this
+// macro's own step list.
+function attachStepDrag(row, m, si) {
+  const grip = $("[data-grip]", row);
+  if (!grip) return;
+  let stepsEl = null, rows = null, dragging = false, startY = 0, targetIdx = null, before = true;
+
+  const clear = () => { if (rows) rows.forEach(r => r.classList.remove("drop-before", "drop-after")); };
+
+  grip.addEventListener("pointerdown", ev => {
+    ev.preventDefault();
+    try { grip.setPointerCapture(ev.pointerId); } catch (e) {}
+    stepsEl = row.parentElement;
+    startY = ev.clientY;
+    dragging = false;
+    targetIdx = null;
+  });
+
+  grip.addEventListener("pointermove", ev => {
+    if (stepsEl == null) return;
+    if (!dragging) {
+      if (Math.abs(ev.clientY - startY) < 5) return;   // movement threshold
+      dragging = true;
+      row.classList.add("dragging");
+      rows = [...stepsEl.children].filter(el => el.classList.contains("mstep"));
+    }
+    // Auto-scroll when dragging near the viewport edges (long step lists).
+    if (ev.clientY < 70) window.scrollBy(0, -10);
+    else if (ev.clientY > window.innerHeight - 70) window.scrollBy(0, 10);
+
+    clear();
+    const first = rows[0].getBoundingClientRect();
+    const last = rows[rows.length - 1].getBoundingClientRect();
+    if (ev.clientY < first.top) {
+      targetIdx = 0; before = true;
+    } else if (ev.clientY > last.bottom) {
+      targetIdx = rows.length - 1; before = false;
+    } else {
+      targetIdx = rows.findIndex(r => {
+        const b = r.getBoundingClientRect();
+        return ev.clientY >= b.top && ev.clientY <= b.bottom;
+      });
+      if (targetIdx < 0) return;
+      const b = rows[targetIdx].getBoundingClientRect();
+      before = (ev.clientY - b.top) < b.height / 2;
+    }
+    rows[targetIdx].classList.add(before ? "drop-before" : "drop-after");
+  });
+
+  const finish = ev => {
+    if (stepsEl == null) return;
+    try { if (grip.hasPointerCapture(ev.pointerId)) grip.releasePointerCapture(ev.pointerId); } catch (e) {}
+    const didDrag = dragging, ti = targetIdx, bf = before;
+    stepsEl = null; dragging = false; targetIdx = null;
+    clear();
+    row.classList.remove("dragging");
+    if (didDrag && ti != null) reorderStep(m, si, ti + (bf ? 0 : 1));   // renderMacros() rebuilds rows
+  };
+  grip.addEventListener("pointerup", finish);
+  grip.addEventListener("pointercancel", finish);
+}
+
 // Move a step within one macro from index `from` to insertion index `to`
 // (both in the pre-move array's coordinates), then re-render.
 function reorderStep(m, from, to) {

@@ -186,8 +186,10 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .mstep.drop-before { box-shadow: inset 0 3px 0 0 var(--accent); }
 .mstep.drop-after  { box-shadow: inset 0 -3px 0 0 var(--accent); }
 .mstep .grip {
-  cursor: grab; color: var(--muted); font-size: 16px; line-height: 1;
-  padding: 0 2px; user-select: none; touch-action: none;
+  cursor: grab; color: var(--muted); font-size: 18px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 32px; min-height: 40px; margin: -6px 0; padding: 0 4px;
+  user-select: none; -webkit-user-select: none; touch-action: none;
 }
 .mstep .grip:active { cursor: grabbing; }
 .mstep .del { margin-left: auto; }
@@ -205,3 +207,27 @@ code { background: var(--bg2); border: 1px solid var(--line); border-radius: 5px
 .msg.err { color: var(--red); }
 
 footer { text-align: center; color: var(--muted); font-size: 12px; padding: 24px 0 40px; }
+
+/* Mobile / narrow screens */
+@media (max-width: 640px) {
+  /* The tab bar's sticky offset assumes a one-row topbar; on narrow screens the
+     topbar can wrap and grow, so stop pinning it and let the tabs pin to top. */
+  .topbar { position: static; padding: 12px 16px; }
+  .tabs { top: 0; }
+  .topbar h1 { font-size: 17px; }
+
+  main { padding: 16px 16px 60px; }
+
+  /* One relay card per row for comfortable tap targets. */
+  .relay-grid { grid-template-columns: 1fr; }
+
+  /* Let dropdowns use the full width instead of a fixed max, so long option
+     text (macro names) stays readable and each control is easy to tap. */
+  .event .actsel, .mstep .actsel { max-width: none; }
+  .event .grp, .mstep .grp { flex: 1 1 140px; }
+
+  /* Bigger tap targets for the primary controls. */
+  .tab { padding: 10px 12px; }
+  .btn { padding: 11px 14px; }
+  .seg button { padding: 11px 0; }
+}
