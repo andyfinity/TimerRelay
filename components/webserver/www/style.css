@@ -182,6 +182,14 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
   background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
 }
+.mstep.dragging { opacity: 0.5; }
+.mstep.drop-before { box-shadow: inset 0 3px 0 0 var(--accent); }
+.mstep.drop-after  { box-shadow: inset 0 -3px 0 0 var(--accent); }
+.mstep .grip {
+  cursor: grab; color: var(--muted); font-size: 16px; line-height: 1;
+  padding: 0 2px; user-select: none; touch-action: none;
+}
+.mstep .grip:active { cursor: grabbing; }
 .mstep .del { margin-left: auto; }
 .delayinput { width: 90px; }
 .addstep { width: 100%; }

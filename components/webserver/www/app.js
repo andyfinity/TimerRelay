@@ -166,6 +166,7 @@ $("#saveWifi").addEventListener("click", async () => {
 /* ---------------- Schedule ---------------- */
 let events = [];
 let macros = [];   // [{index, name, steps:[{delay, action, relays:[]}]}]
+let dragCtx = null;   // { m, from } while a macro step is being dragged
 
 function hms(e) {
   const p = n => String(n).padStart(2, "0");
@@ -291,6 +292,7 @@ function stepRow(m, step, si) {
   const callBlock = `<div class="grp"><span>Macro</span><select class="actsel" data-scall>${callOpts}</select></div>`;
 
   row.innerHTML = `
+    <span class="grip" data-grip title="Drag to reorder" aria-label="Drag to reorder">⠿</span>
     <div class="grp"><span>Wait (s)</span>
       <input type="number" min="0" class="delayinput" value="${step.delay}" data-delay></div>
     ${typeBlock}
@@ -313,7 +315,52 @@ function stepRow(m, step, si) {
     $("[data-saction]", row).addEventListener("change", ev => step.action = ev.target.value);
   }
   $("[data-delstep]", row).addEventListener("click", () => { m.steps.splice(si, 1); renderMacros(); });
+
+  // Drag-and-drop reordering. The row is only draggable while the grip is held,
+  // so the inputs/selects stay normally interactive. Drops are confined to the
+  // same macro's step list.
+  const grip = $("[data-grip]", row);
+  grip.addEventListener("mousedown", () => row.setAttribute("draggable", "true"));
+  grip.addEventListener("mouseup", () => row.removeAttribute("draggable"));
+  row.addEventListener("dragstart", ev => {
+    dragCtx = { m, from: si };
+    row.classList.add("dragging");
+    ev.dataTransfer.effectAllowed = "move";
+    try { ev.dataTransfer.setData("text/plain", String(si)); } catch (e) {}
+  });
+  row.addEventListener("dragend", () => {
+    row.classList.remove("dragging");
+    row.removeAttribute("draggable");
+    row.classList.remove("drop-before", "drop-after");
+    dragCtx = null;
+  });
+  row.addEventListener("dragover", ev => {
+    if (!dragCtx || dragCtx.m !== m) return;   // only within the same macro
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = "move";
+    const before = (ev.clientY - row.getBoundingClientRect().top) < row.offsetHeight / 2;
+    row.classList.toggle("drop-before", before);
+    row.classList.toggle("drop-after", !before);
+  });
+  row.addEventListener("dragleave", () => row.classList.remove("drop-before", "drop-after"));
+  row.addEventListener("drop", ev => {
+    if (!dragCtx || dragCtx.m !== m) return;
+    ev.preventDefault();
+    const before = row.classList.contains("drop-before");
+    row.classList.remove("drop-before", "drop-after");
+    reorderStep(m, dragCtx.from, si + (before ? 0 : 1));
+  });
   return row;
+}
+// Move a step within one macro from index `from` to insertion index `to`
+// (both in the pre-move array's coordinates), then re-render.
+function reorderStep(m, from, to) {
+  if (from == null || from < 0 || from >= m.steps.length) return;
+  const [moved] = m.steps.splice(from, 1);
+  if (from < to) to--;              // account for the removed element
+  to = Math.max(0, Math.min(to, m.steps.length));
+  m.steps.splice(to, 0, moved);
+  renderMacros();
 }
 function macroCard(m, mi) {
   const div = document.createElement("div");
