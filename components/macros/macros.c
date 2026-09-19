@@ -135,16 +135,36 @@ static void begin_locked(int idx, macro_run_t mode)
     s_stack[0].pass = 0;
 }
 
+// End the active macro (finished or stopped) and release its overrides: the
+// whole macro layer is reset to AUTO so every relay it touched falls back to
+// the schedule. Returns true if any relay mode changed. Lock held.
+static bool finish_locked(void)
+{
+    app_config_t *cfg = appstate_config();
+    s_active = false;
+    s_depth = 0;
+    bool changed = false;
+    for (int r = 0; r < RELAY_COUNT; r++) {
+        if (cfg->relay_macro[r] != RELAY_MODE_AUTO) {
+            cfg->relay_macro[r] = RELAY_MODE_AUTO;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
 bool macros_start(int idx, macro_run_t mode)
 {
+    bool changed = false;
     appstate_lock();
     if (!macro_valid_locked(idx)) { appstate_unlock(); return false; }
     begin_locked(idx, mode);
-    if (!resolve_current_locked()) s_active = false;
+    if (!resolve_current_locked()) changed = finish_locked();
     else s_next_ms = now_ms() + current_delay_ms_locked();
     publish_status_locked();
     ESP_LOGI(TAG, "macro %d started (%s)", idx, mode == MACRO_RUN_AUTO ? "auto" : "manual");
     appstate_unlock();
+    if (changed) appstate_save_config();
     return true;
 }
 
@@ -163,10 +183,13 @@ bool macros_start_by_name(const char *name, macro_run_t mode)
 
 void macros_stop(void)
 {
+    bool changed;
     appstate_lock();
-    if (s_active) { ESP_LOGI(TAG, "macro stopped"); s_active = false; s_depth = 0; }
+    if (s_active) ESP_LOGI(TAG, "macro stopped");
+    changed = finish_locked();   // ends the run and releases the macro layer
     publish_status_locked();
     appstate_unlock();
+    if (changed) appstate_save_config();
 }
 
 bool macros_step(int idx)
@@ -175,15 +198,17 @@ bool macros_step(int idx)
     appstate_lock();
     if (!s_active) {
         if (idx < 0 || !macro_valid_locked(idx)) { appstate_unlock(); return false; }
-        begin_locked(idx, MACRO_RUN_MANUAL);
+        begin_locked(idx, MACRO_RUN_AUTO);
     }
-    s_run = MACRO_RUN_MANUAL;
+    // Stepping advances one step immediately but the macro keeps running on its
+    // auto timer - it does not pause or hold. The next step is rescheduled from
+    // now, so the sequence continues from where the step left it.
     if (resolve_current_locked()) {
         changed = execute_current_locked();
         if (resolve_current_locked()) s_next_ms = now_ms() + current_delay_ms_locked();
-        else s_active = false;
+        else changed |= finish_locked();
     } else {
-        s_active = false;
+        changed |= finish_locked();
     }
     publish_status_locked();
     appstate_unlock();
@@ -200,11 +225,11 @@ bool macros_tick(void)
         int64_t t = now_ms();
         int guard = 0;
         while (s_active && t >= s_next_ms && guard++ < 256) {
-            if (!resolve_current_locked()) { s_active = false; break; }
+            if (!resolve_current_locked()) { if (finish_locked()) changed = true; stepped = true; break; }
             if (execute_current_locked()) changed = true;
             stepped = true;
             if (resolve_current_locked()) s_next_ms += current_delay_ms_locked();
-            else s_active = false;
+            else if (finish_locked()) changed = true;
         }
         if (stepped) publish_status_locked();
     }

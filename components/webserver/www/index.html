@@ -63,7 +63,7 @@
           <button class="btn primary" id="saveMacros">Save macros</button>
         </div>
       </div>
-      <p class="hint">A macro runs a timed series of relay actions. Each step waits its delay (seconds) after the previous step, then applies its action to the selected relays. Steps set relay overrides — use an <b>Auto</b> action to hand a relay back to the schedule. Save before running.</p>
+      <p class="hint">A macro runs a timed series of relay actions. Each step waits its delay (seconds) after the previous step, then applies its action to the selected relays. Relay overrides hold only while the macro runs — when it finishes or is stopped, every relay it touched returns to the schedule. <b>Step</b> jumps to the next step immediately without pausing the timer. Save before running.</p>
       <div id="macroActive" class="macro-active" hidden></div>
       <div id="macroList" class="macro-list"></div>
       <div id="macroMsg" class="msg"></div>
