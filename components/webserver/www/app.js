@@ -30,10 +30,12 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
 
 /* ---------------- Status polling ---------------- */
 const REPORT = {
-  auto_on:   { txt: "Auto · On",     on: true,  manual: false },
-  auto_off:  { txt: "Auto · Off",    on: false, manual: false },
-  manual_on: { txt: "Manual · On",   on: true,  manual: true  },
-  manual_off:{ txt: "Manual · Off",  on: false, manual: true  },
+  auto_on:   { txt: "Auto · On",     on: true,  cls: ""       },
+  auto_off:  { txt: "Auto · Off",    on: false, cls: ""       },
+  macro_on:  { txt: "Macro · On",    on: true,  cls: "macro"  },
+  macro_off: { txt: "Macro · Off",   on: false, cls: "macro"  },
+  manual_on: { txt: "Manual · On",   on: true,  cls: "manual" },
+  manual_off:{ txt: "Manual · Off",  on: false, cls: "manual" },
 };
 let relaysBuilt = false;
 
@@ -69,7 +71,7 @@ function renderRelay(r) {
   const st = $("#rstate" + r.id);
   const info = REPORT[r.report] || REPORT.auto_off;
   st.innerHTML = `<span class="dot ${info.on ? "on" : ""}"></span>${info.txt}`;
-  st.className = "state " + (info.on ? "on" : "off") + (info.manual ? " manual" : "");
+  st.className = "state " + (info.on ? "on" : "off") + (info.cls ? " " + info.cls : "");
   const seg = $("#rseg" + r.id);
   $$("button", seg).forEach(b => {
     b.className = "";

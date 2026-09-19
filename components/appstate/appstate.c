@@ -16,6 +16,11 @@ static const char *TAG = "appstate";
 #define KEY_MODES    "modes"
 #define KEY_WIFI     "wifi"
 
+// The modes blob holds both override layers back to back: manual first, then
+// macro. Its length changed when the macro layer was added, so an older blob is
+// rejected by the exact-size check in storage and both layers default to AUTO.
+#define MODES_BLOB_LEN (2 * RELAY_COUNT)
+
 // Wi-Fi credentials live in their own small blob so that changes to the larger
 // settings layout never cost the user their network configuration.
 typedef struct {
@@ -47,8 +52,15 @@ static app_runtime_t     s_rt;
 
 // Shadows of what is currently on flash, for write-on-change comparison.
 static settings_blob_t   s_shadow_settings;
-static uint8_t           s_shadow_modes[RELAY_COUNT];
+static uint8_t           s_shadow_modes[MODES_BLOB_LEN];
 static wifi_blob_t       s_shadow_wifi;
+
+// Pack both override layers into one contiguous blob: manual then macro.
+static void pack_modes(uint8_t *buf)
+{
+    memcpy(buf,               s_cfg.relay_manual, RELAY_COUNT);
+    memcpy(buf + RELAY_COUNT, s_cfg.relay_macro,  RELAY_COUNT);
+}
 
 // Scratch blob buffer. The struct is a few KB; keep it off the (smaller) task
 // stacks. Only ever touched while the appstate lock is held.
@@ -95,7 +107,8 @@ static void load_defaults(void)
     strlcpy(s_cfg.tz_posix, "UTC0", sizeof(s_cfg.tz_posix));
     strlcpy(s_cfg.hostname, "timerrelay", sizeof(s_cfg.hostname));
     for (int i = 0; i < RELAY_COUNT; i++) {
-        s_cfg.relay_mode[i] = RELAY_MODE_AUTO;
+        s_cfg.relay_manual[i] = RELAY_MODE_AUTO;
+        s_cfg.relay_macro[i]  = RELAY_MODE_AUTO;
     }
     s_cfg.event_count = 0;
 }
@@ -125,17 +138,20 @@ void appstate_init(void)
         ESP_LOGW(TAG, "no valid settings in NVS; using defaults");
     }
 
-    uint8_t modes[RELAY_COUNT];
+    uint8_t modes[MODES_BLOB_LEN];
     if (storage_get_blob(KEY_MODES, modes, sizeof(modes))) {
         for (int i = 0; i < RELAY_COUNT; i++) {
-            s_cfg.relay_mode[i] = (modes[i] <= RELAY_MODE_OFF) ? modes[i] : RELAY_MODE_AUTO;
+            uint8_t man = modes[i];
+            uint8_t mac = modes[RELAY_COUNT + i];
+            s_cfg.relay_manual[i] = (man <= RELAY_MODE_OFF) ? man : RELAY_MODE_AUTO;
+            s_cfg.relay_macro[i]  = (mac <= RELAY_MODE_OFF) ? mac : RELAY_MODE_AUTO;
         }
     }
 
     // Prime shadows so the first save only writes if something actually changed.
     pack_settings(&s_shadow_settings);
     pack_wifi(&s_shadow_wifi);
-    memcpy(s_shadow_modes, s_cfg.relay_mode, sizeof(s_shadow_modes));
+    pack_modes(s_shadow_modes);
 }
 
 void appstate_lock(void)   { xSemaphoreTakeRecursive(s_mutex, portMAX_DELAY); }
@@ -166,9 +182,11 @@ void appstate_save_config(void)
         }
     }
 
-    if (memcmp(s_cfg.relay_mode, s_shadow_modes, sizeof(s_shadow_modes)) != 0) {
-        if (storage_set_blob(KEY_MODES, s_cfg.relay_mode, sizeof(s_shadow_modes)) == ESP_OK) {
-            memcpy(s_shadow_modes, s_cfg.relay_mode, sizeof(s_shadow_modes));
+    uint8_t modes[MODES_BLOB_LEN];
+    pack_modes(modes);
+    if (memcmp(modes, s_shadow_modes, sizeof(modes)) != 0) {
+        if (storage_set_blob(KEY_MODES, modes, sizeof(modes)) == ESP_OK) {
+            memcpy(s_shadow_modes, modes, sizeof(modes));
             ESP_LOGI(TAG, "relay modes persisted");
         }
     }
@@ -176,13 +194,25 @@ void appstate_save_config(void)
     appstate_unlock();
 }
 
-relay_report_t appstate_report_for(relay_mode_t mode, bool auto_desired_on)
+relay_report_t appstate_resolve(relay_mode_t manual, relay_mode_t macro,
+                                bool auto_desired_on, bool *desired_on)
 {
-    switch (mode) {
-        case RELAY_MODE_ON:  return RELAY_REPORT_MANUAL_ON;
-        case RELAY_MODE_OFF: return RELAY_REPORT_MANUAL_OFF;
-        case RELAY_MODE_AUTO:
-        default:
-            return auto_desired_on ? RELAY_REPORT_AUTO_ON : RELAY_REPORT_AUTO_OFF;
+    bool on;
+    relay_report_t report;
+
+    // Highest priority first: manual overrides win, then the macro layer, then
+    // the schedule. AUTO at a layer releases control to the next one down.
+    if (manual == RELAY_MODE_ON || manual == RELAY_MODE_OFF) {
+        on = (manual == RELAY_MODE_ON);
+        report = on ? RELAY_REPORT_MANUAL_ON : RELAY_REPORT_MANUAL_OFF;
+    } else if (macro == RELAY_MODE_ON || macro == RELAY_MODE_OFF) {
+        on = (macro == RELAY_MODE_ON);
+        report = on ? RELAY_REPORT_MACRO_ON : RELAY_REPORT_MACRO_OFF;
+    } else {
+        on = auto_desired_on;
+        report = on ? RELAY_REPORT_AUTO_ON : RELAY_REPORT_AUTO_OFF;
     }
+
+    if (desired_on) *desired_on = on;
+    return report;
 }

@@ -116,6 +116,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .state.on  { color: var(--green); border-color: rgba(53,201,138,.5); }
 .state.off { color: var(--muted); }
 .state.manual { box-shadow: inset 0 0 0 1px rgba(242,176,53,.35); }
+.state.macro  { box-shadow: inset 0 0 0 1px rgba(90,141,238,.45); }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--muted); vertical-align: middle; }
 .dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
 

@@ -78,10 +78,13 @@ static bool resolve_current_locked(void)
     return s_depth > 0;
 }
 
-static uint16_t current_delay_locked(void)
+// Delay before the current step, in milliseconds (delay_s is in seconds; the
+// monotonic due-time bookkeeping is in ms). Widened to int64 so the * 1000 does
+// not overflow for large delays.
+static int64_t current_delay_ms_locked(void)
 {
     const frame_t *f = &s_stack[s_depth - 1];
-    return appstate_config()->macros[f->macro_idx].steps[f->step].delay_s;
+    return (int64_t)appstate_config()->macros[f->macro_idx].steps[f->step].delay_s * 1000;
 }
 
 // Execute the current step and advance past it. A relay step applies its mode;
@@ -108,11 +111,14 @@ static bool execute_current_locked(void)
         return false;
     }
 
+    // Macros drive the macro override layer only; the controller still owns the
+    // GPIOs and manual overrides still sit above this. An AUTO action releases
+    // the masked relays back to the schedule.
     uint8_t mode = st->action <= RELAY_MODE_OFF ? st->action : RELAY_MODE_AUTO;
     bool changed = false;
     for (int r = 0; r < RELAY_COUNT; r++) {
-        if ((st->relay_mask & (1u << r)) && cfg->relay_mode[r] != mode) {
-            cfg->relay_mode[r] = mode;
+        if ((st->relay_mask & (1u << r)) && cfg->relay_macro[r] != mode) {
+            cfg->relay_macro[r] = mode;
             changed = true;
         }
     }
@@ -135,7 +141,7 @@ bool macros_start(int idx, macro_run_t mode)
     if (!macro_valid_locked(idx)) { appstate_unlock(); return false; }
     begin_locked(idx, mode);
     if (!resolve_current_locked()) s_active = false;
-    else s_next_ms = now_ms() + current_delay_locked();
+    else s_next_ms = now_ms() + current_delay_ms_locked();
     publish_status_locked();
     ESP_LOGI(TAG, "macro %d started (%s)", idx, mode == MACRO_RUN_AUTO ? "auto" : "manual");
     appstate_unlock();
@@ -174,7 +180,7 @@ bool macros_step(int idx)
     s_run = MACRO_RUN_MANUAL;
     if (resolve_current_locked()) {
         changed = execute_current_locked();
-        if (resolve_current_locked()) s_next_ms = now_ms() + current_delay_locked();
+        if (resolve_current_locked()) s_next_ms = now_ms() + current_delay_ms_locked();
         else s_active = false;
     } else {
         s_active = false;
@@ -197,7 +203,7 @@ bool macros_tick(void)
             if (!resolve_current_locked()) { s_active = false; break; }
             if (execute_current_locked()) changed = true;
             stepped = true;
-            if (resolve_current_locked()) s_next_ms += current_delay_locked();
+            if (resolve_current_locked()) s_next_ms += current_delay_ms_locked();
             else s_active = false;
         }
         if (stepped) publish_status_locked();
