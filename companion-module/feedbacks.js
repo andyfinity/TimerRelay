@@ -6,6 +6,8 @@ const { RELAY_CHOICES } = require('./actions')
 const REPORT_CHOICES = [
 	{ id: 'auto_on', label: 'Auto · On' },
 	{ id: 'auto_off', label: 'Auto · Off' },
+	{ id: 'macro_on', label: 'Macro · On' },
+	{ id: 'macro_off', label: 'Macro · Off' },
 	{ id: 'manual_on', label: 'Manual · On' },
 	{ id: 'manual_off', label: 'Manual · Off' },
 ]
@@ -13,11 +15,11 @@ const REPORT_CHOICES = [
 function getFeedbacks(self) {
 	const macros = self.macros && self.macros.length ? self.macros : [{ id: 0, label: '(no macros defined)' }]
 	return {
-		// The core feedback requested: match one of the four reported states.
+		// The core feedback requested: match one of the reported states.
 		relay_state: {
 			type: 'boolean',
 			name: 'Relay is in state',
-			description: 'True when the selected relay reports the selected state (auto/manual x on/off).',
+			description: 'True when the selected relay reports the selected state (auto/macro/manual x on/off).',
 			defaultStyle: {
 				bgcolor: combineRgb(0, 120, 60),
 				color: combineRgb(255, 255, 255),

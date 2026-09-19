@@ -27,19 +27,26 @@ extern "C" {
 #define TZ_POSIX_MAX         48   // POSIX TZ string with DST rules
 #define HOSTNAME_MAX         33
 
-// --- Relay override mode (persisted per relay) -----------------------------
+// --- Relay override mode (per priority layer) ------------------------------
+// The same three-valued mode is used by each override layer (manual, macro).
+// AUTO means "release control to the next layer down": manual AUTO falls
+// through to the macro layer, macro AUTO falls through to the schedule.
 typedef enum {
-    RELAY_MODE_AUTO = 0,   // follow the schedule
-    RELAY_MODE_ON   = 1,   // manual override: forced enabled (energized / NO)
-    RELAY_MODE_OFF  = 2,   // manual override: forced disabled (de-energized / NC)
+    RELAY_MODE_AUTO = 0,   // release to the layer below (schedule for macros)
+    RELAY_MODE_ON   = 1,   // override: forced enabled (energized / NO)
+    RELAY_MODE_OFF  = 2,   // override: forced disabled (de-energized / NC)
 } relay_mode_t;
 
-// Reported state exposed to the UI / REST / Companion feedback.
+// Reported state exposed to the UI / REST / Companion feedback. Names the layer
+// that actually decides the relay's level (highest-priority non-AUTO layer wins;
+// otherwise the schedule).
 typedef enum {
-    RELAY_REPORT_AUTO_OFF = 0,
-    RELAY_REPORT_AUTO_ON  = 1,
+    RELAY_REPORT_AUTO_OFF   = 0,
+    RELAY_REPORT_AUTO_ON    = 1,
     RELAY_REPORT_MANUAL_OFF = 2,
     RELAY_REPORT_MANUAL_ON  = 3,
+    RELAY_REPORT_MACRO_OFF  = 4,
+    RELAY_REPORT_MACRO_ON   = 5,
 } relay_report_t;
 
 // --- Schedule event model --------------------------------------------------
@@ -92,7 +99,8 @@ typedef struct {
 typedef struct {
     uint16_t delay_s;      // seconds to wait before this step (>= 0)
     uint8_t  relay_mask;   // bit0..bit5 -> relay 1..6 (when call_macro < 0)
-    uint8_t  action;       // relay_mode_t applied to the masked relays
+    uint8_t  action;       // relay_mode_t applied to the masked relays' macro
+                           // layer (AUTO releases them back to the schedule)
     int8_t   call_macro;   // -1 = relay action; >=0 = run that macro inline
 } macro_step_t;
 
@@ -132,7 +140,12 @@ typedef struct {
     char     tz_name[TZ_NAME_MAX];     // human key, e.g. "America/New_York"
     char     tz_posix[TZ_POSIX_MAX];   // POSIX TZ, e.g. "EST5EDT,M3.2.0,M11.1.0"
     char     hostname[HOSTNAME_MAX];
-    uint8_t  relay_mode[RELAY_COUNT];  // relay_mode_t per relay
+    // Two independent override layers, highest priority first. A relay's level
+    // is decided by the highest layer set to ON/OFF; AUTO releases to the next
+    // layer down (macro), and macro AUTO releases to the schedule. Manual is set
+    // from the relay controls; macro is set by the macro engine.
+    uint8_t  relay_manual[RELAY_COUNT];  // relay_mode_t per relay (top priority)
+    uint8_t  relay_macro[RELAY_COUNT];   // relay_mode_t per relay (over schedule)
     uint16_t event_count;
     sched_event_t events[MAX_SCHEDULE_EVENTS];
     uint8_t  macro_count;
@@ -173,8 +186,13 @@ app_runtime_t *appstate_runtime(void);
 // Safe to call often; it is a no-op when nothing changed (write-on-change).
 void appstate_save_config(void);
 
-// Compute the reported state for a relay from its mode + desired auto state.
-relay_report_t appstate_report_for(relay_mode_t mode, bool auto_desired_on);
+// Resolve the override layers (manual > macro > schedule) for one relay into
+// the desired physical level and its reported state. `manual` and `macro` are
+// the per-relay override modes; `auto_desired_on` is what the schedule wants
+// (already gated by clock validity by the caller). Writes *desired_on (may be
+// NULL) and returns the report naming the deciding layer.
+relay_report_t appstate_resolve(relay_mode_t manual, relay_mode_t macro,
+                                bool auto_desired_on, bool *desired_on);
 
 #ifdef __cplusplus
 }

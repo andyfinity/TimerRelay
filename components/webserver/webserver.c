@@ -95,6 +95,8 @@ static const char *report_to_str(uint8_t r)
         case RELAY_REPORT_AUTO_ON:   return "auto_on";
         case RELAY_REPORT_AUTO_OFF:  return "auto_off";
         case RELAY_REPORT_MANUAL_ON: return "manual_on";
+        case RELAY_REPORT_MACRO_ON:  return "macro_on";
+        case RELAY_REPORT_MACRO_OFF: return "macro_off";
         default:                     return "manual_off";
     }
 }
@@ -196,7 +198,10 @@ static esp_err_t h_status(httpd_req_t *req)
     for (int r = 0; r < RELAY_COUNT; r++) {
         cJSON *o = cJSON_CreateObject();
         cJSON_AddNumberToObject(o, "id", r + 1);
-        cJSON_AddStringToObject(o, "mode", mode_to_str(cfg->relay_mode[r]));
+        // "mode" is the manual (top-priority) layer the relay controls set;
+        // "macro" is the macro override layer beneath it.
+        cJSON_AddStringToObject(o, "mode", mode_to_str(cfg->relay_manual[r]));
+        cJSON_AddStringToObject(o, "macro", mode_to_str(cfg->relay_macro[r]));
         cJSON_AddStringToObject(o, "report", report_to_str(rt->relay_report[r]));
         cJSON_AddBoolToObject(o, "physical", rt->relay_physical[r]);
         cJSON_AddItemToArray(relays, o);
@@ -346,8 +351,10 @@ static esp_err_t h_set_relay(httpd_req_t *req)
         else if (!strcmp(ms, "auto")) mode = RELAY_MODE_AUTO;
         else { cJSON_Delete(j); httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "mode"); return ESP_FAIL; }
 
+        // Manual controls drive the top-priority layer; AUTO here releases the
+        // relay to the macro layer (and, if that is AUTO too, to the schedule).
         appstate_lock();
-        appstate_config()->relay_mode[relay - 1] = mode;
+        appstate_config()->relay_manual[relay - 1] = mode;
         appstate_unlock();
         appstate_save_config();
         controller_notify();

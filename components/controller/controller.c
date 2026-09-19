@@ -45,9 +45,10 @@ static void evaluate_and_apply(void)
     // 2. Advance the active macro (monotonic timing; runs even without a clock).
     macros_tick();
 
-    // 3. Relay levels from the schedule. When time is invalid, auto_on stays
-    //    all-false: AUTO relays hold the safe disabled state until the clock is
-    //    known. Manual overrides (incl. macro-set ones) still apply.
+    // 3. Relay levels: resolve the priority layers manual > macro > schedule.
+    //    When time is invalid, auto_on stays all-false so schedule-controlled
+    //    relays hold the safe disabled state until the clock is known; manual
+    //    and macro overrides (monotonic-timed) still apply.
     bool auto_on[RELAY_COUNT] = {0};
     if (time_valid) {
         schedule_eval(now, auto_on);
@@ -58,17 +59,12 @@ static void evaluate_and_apply(void)
     app_config_t  *cfg = appstate_config();
     app_runtime_t *rt  = appstate_runtime();
     for (int r = 0; r < RELAY_COUNT; r++) {
-        relay_mode_t mode = (relay_mode_t)cfg->relay_mode[r];
         bool desired;
-        switch (mode) {
-            case RELAY_MODE_ON:  desired = true;  break;
-            case RELAY_MODE_OFF: desired = false; break;
-            case RELAY_MODE_AUTO:
-            default:             desired = time_valid && auto_on[r]; break;
-        }
+        rt->relay_report[r] = appstate_resolve((relay_mode_t)cfg->relay_manual[r],
+                                               (relay_mode_t)cfg->relay_macro[r],
+                                               time_valid && auto_on[r], &desired);
         phys[r] = desired ? 1 : 0;
         rt->relay_physical[r] = phys[r];
-        rt->relay_report[r] = appstate_report_for(mode, time_valid && auto_on[r]);
     }
     appstate_unlock();
 
